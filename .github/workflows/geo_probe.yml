@@ -1,0 +1,27 @@
+# Week 1 geo-block test: can GitHub's (US) runners reach PIHPS?
+# Run manually from the Actions tab. Pass = HTTP 200 with a "data" list.
+name: geo-probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Request one small PIHPS table
+        run: |
+          set -e
+          code=$(curl -sS -m 120 -o out.json -w "%{http_code}" \
+            -A "PanganWatch/0.1 (portfolio research; contact via GitHub repo)" \
+            -G "https://www.bi.go.id/hargapangan/WebSite/TabelHarga/GetGridDataDaerah" \
+            --data-urlencode "price_type_id=1" --data-urlencode "comcat_id=cat_8" \
+            --data-urlencode "province_id=13" --data-urlencode "regency_id=" \
+            --data-urlencode "market_id=" --data-urlencode "tipe_laporan=1" \
+            --data-urlencode "start_date=$(date -d '-10 days' +%F)" \
+            --data-urlencode "end_date=$(date +%F)") || code="curl-failed"
+          echo "HTTP: $code"
+          head -c 400 out.json || true
+          echo
+          [ "$code" = "200" ] && grep -q '"data"' out.json

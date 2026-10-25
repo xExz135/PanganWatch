@@ -1,0 +1,32 @@
+# Source settings. No URLs, codes, sleeps or retry counts live in code.
+# Endpoint details and how they were found: docs/source_notes.md
+
+http:
+  user_agent: "PanganWatch/0.1 (portfolio research project; +https://github.com/xExz135/PanganWatch)"
+  timeout_seconds: 180          # a 1-year city request takes ~40 s
+  sleep_seconds: 2              # politeness pause between requests
+  retry_backoff_seconds: [2, 8, 30]   # 3 attempts, on timeouts and 5xx only
+
+pihps:
+  base_url: "https://www.bi.go.id/hargapangan/WebSite/TabelHarga"
+  endpoints:
+    grid: "GetGridDataDaerah"
+    price_types: "GetRefPriceType"
+    commodities: "GetRefCommodityAndCategory"
+    provinces: "GetRefProvince"
+    regencies: "GetRefRegency"
+  report_type_daily: 1          # tipe_laporan: 1 = Laporan Harian
+  date_format: "%Y-%m-%d"       # request dates; response columns are dd/mm/yyyy
+  # PIHPS price_type_id -> our market_tier
+  market_tiers:
+    traditional: 1              # Pasar Tradisional
+    modern: 2                   # Pasar Modern
+    wholesale: 3                # Pedagang Besar
+    producer: 4                 # Produsen
+  backfill:
+    start_date: "2022-01-01"
+    chunk: "year"               # one request = one city x one tier x one calendar year
+    tier_order: [traditional, producer, wholesale, modern]
+  daily:
+    rolling_window_days: 7      # PIHPS may revise recent values
+    max_failed_share: 0.05      # run exits non-zero above this share of failed requests

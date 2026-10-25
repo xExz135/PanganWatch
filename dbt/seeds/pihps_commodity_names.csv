@@ -1,0 +1,22 @@
+pihps_name,pihps_id,commodity_id
+Beras Kualitas Bawah I,com_1,beras_bawah_1
+Beras Kualitas Bawah II,com_2,beras_bawah_2
+Beras Kualitas Medium I,com_3,beras_medium_1
+Beras Kualitas Medium II,com_4,beras_medium_2
+Beras Kualitas Super I,com_5,beras_super_1
+Beras Kualitas Super II,com_6,beras_super_2
+Daging Ayam Ras Segar,com_7,daging_ayam_ras
+Daging Sapi Kualitas 1,com_8,daging_sapi_1
+Daging Sapi Kualitas 2,com_9,daging_sapi_2
+Telur Ayam Ras Segar,com_10,telur_ayam_ras
+Bawang Merah Ukuran Sedang,com_11,bawang_merah
+Bawang Putih Ukuran Sedang,com_12,bawang_putih
+Cabai Merah Besar,com_13,cabai_merah_besar
+Cabai Merah Keriting,com_14,cabai_merah_keriting
+Cabai Rawit Hijau,com_15,cabai_rawit_hijau
+Cabai Rawit Merah,com_16,cabai_rawit_merah
+Minyak Goreng Curah,com_17,minyak_goreng_curah
+Minyak Goreng Kemasan Bermerk 1,com_18,minyak_goreng_kemasan_1
+Minyak Goreng Kemasan Bermerk 2,com_19,minyak_goreng_kemasan_2
+Gula Pasir Kualitas Premium,com_20,gula_pasir_premium
+Gula Pasir Lokal,com_21,gula_pasir_lokal

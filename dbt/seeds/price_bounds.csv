@@ -1,0 +1,7 @@
+commodity_group,min_price_idr,max_price_idr,note
+chili,5000,250000,spec example; covers producer tier lows and Lebaran highs
+onion,5000,150000,
+rice,5000,30000,
+protein,10000,250000,eggs and chicken sit well inside; beef up to ~170k
+oil,8000,50000,
+sugar,8000,40000,

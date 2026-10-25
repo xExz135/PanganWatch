@@ -1,0 +1,28 @@
+commodity_id,province_id,verified,note
+cabai_rawit_merah,35,false,Jawa Timur
+cabai_rawit_merah,33,false,Jawa Tengah
+cabai_rawit_merah,32,false,Jawa Barat
+cabai_rawit_merah,52,false,Nusa Tenggara Barat
+cabai_merah_keriting,32,false,Jawa Barat
+cabai_merah_keriting,33,false,Jawa Tengah
+cabai_merah_keriting,35,false,Jawa Timur
+cabai_merah_keriting,12,false,Sumatera Utara
+bawang_merah,33,false,Jawa Tengah (Brebes)
+bawang_merah,35,false,Jawa Timur
+bawang_merah,52,false,Nusa Tenggara Barat
+bawang_merah,32,false,Jawa Barat
+beras_medium_1,35,false,Jawa Timur
+beras_medium_1,33,false,Jawa Tengah
+beras_medium_1,32,false,Jawa Barat
+beras_medium_1,73,false,Sulawesi Selatan
+beras_medium_1,16,false,Sumatera Selatan
+telur_ayam_ras,35,false,Jawa Timur (Blitar)
+telur_ayam_ras,33,false,Jawa Tengah
+telur_ayam_ras,32,false,Jawa Barat
+daging_ayam_ras,32,false,Jawa Barat
+daging_ayam_ras,35,false,Jawa Timur
+daging_ayam_ras,33,false,Jawa Tengah
+minyak_goreng_curah,14,false,Riau (palm oil)
+minyak_goreng_curah,61,false,Kalimantan Barat (palm oil)
+minyak_goreng_curah,62,false,Kalimantan Tengah (palm oil)
+minyak_goreng_curah,12,false,Sumatera Utara (palm oil)

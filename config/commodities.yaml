@@ -1,0 +1,26 @@
+# Commodities in scope. Every PIHPS request returns all 21 commodities, so all are
+# kept in bronze and silver; `v1: true` marks the 8 the spec models first.
+# commodity_id is ours (stable slug); pihps_id is the source's "com_N" key.
+
+commodities:
+  - {commodity_id: cabai_rawit_merah,    pihps_id: com_16, v1: true}
+  - {commodity_id: cabai_merah_keriting, pihps_id: com_14, v1: true}
+  - {commodity_id: bawang_merah,         pihps_id: com_11, v1: true}
+  - {commodity_id: bawang_putih,         pihps_id: com_12, v1: true}
+  - {commodity_id: beras_medium_1,       pihps_id: com_3,  v1: true}
+  - {commodity_id: telur_ayam_ras,       pihps_id: com_10, v1: true}
+  - {commodity_id: daging_ayam_ras,      pihps_id: com_7,  v1: true}
+  - {commodity_id: minyak_goreng_curah,  pihps_id: com_17, v1: true}
+  - {commodity_id: beras_bawah_1,        pihps_id: com_1,  v1: false}
+  - {commodity_id: beras_bawah_2,        pihps_id: com_2,  v1: false}
+  - {commodity_id: beras_medium_2,       pihps_id: com_4,  v1: false}
+  - {commodity_id: beras_super_1,        pihps_id: com_5,  v1: false}
+  - {commodity_id: beras_super_2,        pihps_id: com_6,  v1: false}
+  - {commodity_id: daging_sapi_1,        pihps_id: com_8,  v1: false}
+  - {commodity_id: daging_sapi_2,        pihps_id: com_9,  v1: false}
+  - {commodity_id: cabai_merah_besar,    pihps_id: com_13, v1: false}
+  - {commodity_id: cabai_rawit_hijau,    pihps_id: com_15, v1: false}
+  - {commodity_id: minyak_goreng_kemasan_1, pihps_id: com_18, v1: false}
+  - {commodity_id: minyak_goreng_kemasan_2, pihps_id: com_19, v1: false}
+  - {commodity_id: gula_pasir_premium,   pihps_id: com_20, v1: false}
+  - {commodity_id: gula_pasir_lokal,     pihps_id: com_21, v1: false}

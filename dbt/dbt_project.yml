@@ -1,0 +1,40 @@
+name: panganwatch
+version: "0.1.0"
+config-version: 2
+profile: panganwatch
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Bronze lives on disk as raw files + a JSONL manifest (docs/decisions.md).
+  bronze_root: "{{ env_var('PANGANWATCH_BRONZE', '../data/bronze') }}"
+  # Freshness is an error in production; the static sample DB is old on purpose.
+  enforce_freshness: "{{ env_var('PANGANWATCH_ENFORCE_FRESHNESS', 'false') }}"
+  max_working_days_stale: 2
+  daily_jump_threshold: 0.60
+  coverage_min_share: 0.80
+  tier_order_max_violation_share: 0.05
+
+seeds:
+  panganwatch:
+    +schema: null
+    calendar_events:
+      +column_types: {event_date: date, is_national_holiday: boolean, verified: boolean}
+    school_holidays:
+      +column_types: {start_date: date, end_date: date, verified: boolean}
+    provinces:
+      +column_types: {province_id: integer, pihps_province_id: integer, bps_code: varchar}
+    pihps_cities:
+      +column_types: {city_id: integer, pihps_province_id: integer}
+
+models:
+  panganwatch:
+    staging:
+      +materialized: table
+    marts:
+      +materialized: table

@@ -1,0 +1,11 @@
+panganwatch:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('PANGANWATCH_DB', '../data/panganwatch.duckdb') }}"
+      threads: 4
+    sample:
+      type: duckdb
+      path: "{{ env_var('PANGANWATCH_DB', '../data/sample/panganwatch_sample.duckdb') }}"
+      threads: 4

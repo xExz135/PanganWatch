@@ -1,0 +1,172 @@
+city_id,city_name,pihps_province_id,has_traditional,has_modern,has_wholesale,has_producer
+1,Kota Banda Aceh,1,True,True,True,True
+2,Kota Lhokseumawe,1,True,True,True,True
+3,Kota Meulaboh,1,True,True,True,False
+4,Kota Medan,2,True,True,True,True
+5,Kota Sibolga,2,True,True,True,False
+6,Kota Pematang Siantar,2,True,True,True,True
+7,Kota Padang Sidempuan,2,True,True,True,True
+8,Kota Padang,3,True,True,True,True
+9,Kota Bukittinggi,3,True,True,True,True
+10,Kota Pekanbaru,4,True,True,True,True
+11,Kota Dumai,4,True,False,True,True
+12,Kota Tembilahan,4,True,False,True,False
+13,Kota Batam,5,True,True,True,True
+14,Kota Tanjung Pinang,5,True,False,False,True
+15,Kota Jambi,6,True,True,True,True
+16,Kab. Bungo,6,True,True,True,False
+17,Kota Bengkulu,7,True,True,True,True
+18,Kota Palembang,8,True,True,True,True
+19,Kota Lubuk Linggau,8,True,False,False,True
+20,Kota Pangkal Pinang,9,True,True,True,True
+21,Kota Tanjung Pandan,9,True,False,False,False
+22,Kota Bandar Lampung,10,True,True,True,True
+23,Kota Metro,10,True,True,True,True
+24,Kota Serang,11,True,True,False,True
+25,Kota Cilegon,11,True,False,False,False
+26,Kota Tangerang,11,True,True,True,True
+27,Kota Bandung,12,True,True,True,True
+28,Kota Cirebon,12,True,True,True,True
+29,Kota Tasikmalaya,12,True,True,True,True
+30,Kota Bekasi,12,True,True,True,True
+31,Kota Bogor,12,True,True,True,True
+32,Kota Depok,12,True,True,True,True
+33,Kota Sukabumi,12,True,True,True,True
+34,Kota Jakarta Pusat,13,True,True,True,False
+35,Kota Semarang,14,True,True,True,True
+36,Kota Surakarta (Solo),14,True,True,True,True
+37,Kota Tegal,14,True,True,True,True
+38,Kab. Banyumas,14,True,True,True,True
+39,Kab. Cilacap,14,True,True,True,True
+40,Kab. Kudus,14,True,False,False,True
+41,Kota Yogyakarta,15,True,True,True,True
+42,Kota Surabaya,16,True,True,True,True
+43,Kota Malang,16,True,True,True,True
+44,Kota Kediri,16,True,True,True,True
+45,Kab. Jember,16,True,True,True,True
+46,Kab. Banyuwangi,16,True,True,True,True
+47,Kota Madiun,16,True,True,True,True
+48,Kota Probolinggo,16,True,True,True,True
+49,Kab. Sumenep,16,True,False,False,True
+50,Kota Denpasar,17,True,True,True,True
+51,Kota Singaraja,17,True,True,False,False
+52,Kota Mataram,18,True,True,True,True
+54,Kota Bima,18,True,True,False,False
+55,Kota Kupang,19,True,True,True,True
+56,Kota Maumere,19,True,True,True,True
+57,Kota Pontianak,20,True,False,True,True
+58,Kota Singkawang,20,True,True,False,True
+59,Kota Banjarmasin,21,True,True,True,True
+60,Kota Tanjung,21,True,False,False,False
+61,Kota Palangkaraya,22,True,True,True,True
+62,Kota Sampit,22,True,False,True,True
+63,Kota Samarinda,23,True,True,True,True
+64,Kota Balikpapan,23,True,True,True,True
+65,Kota Tarakan,24,True,True,True,False
+66,Kota Gorontalo,25,True,True,True,True
+67,Kota Makassar,26,True,True,True,True
+68,Kab. Bulukumba,26,True,False,False,False
+69,Kota Palopo,26,True,False,False,False
+70,Kota Parepare,26,True,False,True,True
+71,Kota Watampone,26,True,False,False,True
+72,Kota Kendari,27,True,True,True,True
+73,Kota Bau-Bau,27,True,False,False,False
+74,Kota Palu,28,True,True,True,True
+75,Kota Manado,29,True,True,True,True
+76,Kota Mamuju,30,True,True,True,True
+77,Kota Ambon,31,True,True,True,True
+78,Kota Tual,31,True,False,True,False
+79,Kota Ternate,32,True,True,True,True
+80,Kota Jayapura,33,True,True,True,True
+81,Kab. Merauke,33,True,True,False,False
+82,Kab. Manokwari,34,True,True,True,True
+83,Kota Sorong,34,True,True,True,True
+88,Kab. Pandeglang,11,False,False,False,True
+90,Kab. Serang,11,False,False,False,True
+95,Kab. Garut,12,False,False,False,True
+96,Kab. Cianjur,12,False,False,False,True
+101,Kab. Karawang,12,False,False,False,True
+102,Kab. Subang,12,False,False,False,True
+103,Kab. Cirebon,12,True,False,False,True
+106,Kab. Tasikmalaya,12,True,False,False,True
+109,Kab. Sumedang,12,False,False,False,True
+113,Kab. Malang,16,False,False,False,True
+114,Kab. Bangkalan,16,False,False,False,True
+115,Kab. Jombang,16,False,False,False,True
+116,Kota Pasuruan,16,False,False,False,True
+118,Kab. Bojonegoro,16,False,False,False,True
+119,Kab. Ngawi,16,False,False,False,True
+120,Kab. Nganjuk,16,False,False,False,True
+121,Kab. Pasuruan,16,False,False,False,True
+123,Kab. Sampang,16,False,False,False,True
+124,Kab. Gresik,16,False,False,False,True
+125,Kab. Tuban,16,False,False,False,True
+128,Kab. Kediri,16,False,False,False,True
+129,Kota Mojokerto,16,False,False,False,True
+130,Kab. Lamongan,16,False,False,False,True
+131,Kab. Ponorogo,16,False,False,False,True
+132,Kab. Blitar,16,False,False,False,True
+134,Kab. Mojokerto,16,False,False,False,True
+135,Kota Blitar,16,True,True,True,True
+136,Kab. Tulungagung,16,False,False,False,True
+137,Kab. Probolinggo,16,False,False,False,True
+138,Kab. Pamekasan,16,False,False,False,True
+139,Kab. Sidoarjo,16,False,False,False,True
+142,Kab. Madiun,16,False,False,False,True
+143,Kota Magelang,14,False,False,False,True
+144,Kab. Sukoharjo,14,True,False,False,True
+145,Kab. Kebumen,14,False,False,False,True
+151,Kab. Sragen,14,True,False,False,True
+154,Kab. Rembang,14,False,False,False,True
+156,Kab. Semarang,14,False,False,False,True
+158,Kab. Karanganyar,14,True,False,False,True
+159,Kab. Klaten,14,True,False,False,True
+160,Kab. Magelang,14,False,False,False,True
+165,Kab. Wonogiri,14,True,False,False,False
+166,Kab. Boyolali,14,True,False,False,True
+168,Kab. Banjarnegara,14,False,False,False,True
+169,Kab. Blora,14,False,False,False,True
+170,Kab. Pati,14,False,False,False,True
+200,Kab. Mimika,33,True,True,False,False
+205,Kab. Nabire,33,True,True,False,False
+219,Kab. Jayawijaya,33,True,True,False,False
+244,Kab. Gorontalo Utara,25,False,False,False,True
+245,Kab. Gorontalo,25,True,False,True,True
+246,Kab. Bualemo,25,False,False,False,True
+247,Kab. Bonebolango,25,False,False,False,True
+248,Kab. Pohuwato,25,False,False,False,True
+249,Kota Kotamobagu,29,True,True,True,False
+261,Kab. Enrekang,26,False,False,False,True
+266,Kab. Pinrang,26,False,False,False,True
+268,Kab. Sidenreng Rappang,26,False,False,False,True
+275,Kab. Maros,26,False,False,False,True
+279,Kab. Takalar,26,False,False,False,True
+285,Kab. Banggai,28,True,True,True,True
+304,Kab. Sumba Timur,19,True,False,True,False
+314,Kab. Bangli,17,False,False,False,True
+315,Kab. Tabanan,17,True,False,False,True
+316,Kab. Gianyar,17,False,False,False,True
+318,Kab. Karangasem,17,False,False,False,True
+319,Kab. Badung,17,True,True,False,True
+340,Kab. Bulungan,24,True,True,True,True
+346,Kota Bontang,23,True,True,False,False
+348,Kab. Nunukan,24,True,True,True,False
+394,Kab. Banyuasin,8,False,False,False,True
+400,Kab. Ogan Komering Ulu Timur,8,False,False,False,True
+401,Kab. Ogan Komering Ilir,8,False,False,False,True
+403,Kab. Ogan Ilir,8,False,False,False,True
+404,Kab. Musi Rawas,8,False,False,False,True
+415,Kab. Siak,4,False,False,False,True
+419,Kab. Kampar,4,False,False,False,True
+421,Kab. Rokan Hulu,4,False,False,False,True
+422,Kab. Bengkalis,4,False,False,False,True
+455,Kota Gunung Sitoli,2,True,True,True,True
+489,Kab. Pidie,1,False,False,False,True
+495,Kab. Aceh Besar,1,False,False,True,True
+496,Kab. Lombok Timur,18,True,False,False,False
+497,Kab. Sumbawa,18,True,False,False,False
+498,Kab. Polewali Mandar,30,True,False,False,True
+499,Kab. Majene,30,True,True,False,True
+782,Kab. Kotabaru,21,True,False,False,True
+784,Kab. Sintang,20,True,False,False,False
+787,Kota Surakarta,14,False,True,False,False

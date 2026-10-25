@@ -1,0 +1,5 @@
+market_tier,tier_order,pihps_price_type_id,description
+producer,1,4,Produsen: farm-gate / producer price
+wholesale,2,3,Pedagang Besar: wholesale trader price
+traditional,3,1,Pasar Tradisional: traditional market retail price
+modern,4,2,Pasar Modern: modern retail (supermarket) price

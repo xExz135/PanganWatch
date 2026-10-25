@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .[dev]
+      - name: Lint
+        run: ruff check .
+      - name: Tests (incl. dbt on a fixture)
+        run: pytest -q
+      - name: dbt build on the sample DB
+        if: hashFiles('data/sample/panganwatch_sample.duckdb') != ''
+        working-directory: dbt
+        run: |
+          cp ../data/sample/panganwatch_sample.duckdb /tmp/sample.duckdb
+          PANGANWATCH_DB=/tmp/sample.duckdb PANGANWATCH_BRONZE=../tests/samples/bronze \
+            dbt build --profiles-dir . --select "seeds marts"
+
+  ownership:
+    # TEAM.md §4: a PR may touch only paths its author role owns (by branch prefix).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed paths against the ownership map
+        run: python .github/scripts/check_ownership.py "${{ github.head_ref }}" "origin/${{ github.base_ref }}"

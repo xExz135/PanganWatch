@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: bronze_pihps_raw
+    description: >
+      Bronze PIHPS: one row per request, payload exactly as received, joined to the
+      fetch manifest. Read from data/bronze/pihps/ (raw files + _manifest.jsonl). Never parsed.
+    columns:
+      - name: request_key
+        description: Manifest key (backfill|tier|city|year or daily|date|tier|city).
+        data_tests: [not_null]
+      - name: status
+        description: ok | empty | failed (shape check at the door).
+        data_tests:
+          - accepted_values:
+              arguments: {values: [ok, empty, failed]}
+
+  - name: stg_pihps_price
+    description: >
+      Silver PIHPS prices, one row per date x commodity x city x market tier. Latest fetch
+      wins per key. No forward-fill. is_jump_flag marks a >60% change vs the city's
+      previous observation (warn, row kept).
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_raw, city_id, market_tier]}
+    columns:
+      - name: date
+        data_tests: [not_null]
+      - name: commodity_id
+        description: NULL means a new PIHPS spelling not yet in pihps_commodity_names.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('commodities'), field: commodity_id}
+      - name: province_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('provinces'), field: province_id}
+      - name: city_id
+        data_tests: [not_null]
+      - name: market_tier
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [traditional, modern, wholesale, producer]}
+      - name: unit
+        data_tests:
+          - accepted_values:
+              arguments: {values: [kg, liter]}
+      - name: price_idr_per_unit
+        description: Integer rupiah per unit.
+        data_tests:
+          - not_null
+          - price_within_bounds:
+              config: {severity: warn}
+      - name: is_jump_flag
+        data_tests:
+          - is_false:
+              config: {severity: warn}

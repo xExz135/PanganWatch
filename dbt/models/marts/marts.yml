@@ -1,0 +1,79 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Calendar 2018-2027 with holiday features. Dates come from seeds/calendar_events.csv;
+      rows with verified=false still need checking against the SKB.
+      is_publishing_day (extra) = weekday and not a national holiday.
+    columns:
+      - name: date
+        data_tests: [unique, not_null]
+
+  - name: dim_commodity
+    description: One row per commodity; pihps_names lists every raw PIHPS spelling mapped to it.
+    columns:
+      - name: commodity_id
+        data_tests: [unique, not_null]
+
+  - name: dim_province
+    description: >
+      34 provinces as PIHPS reports them (pre-2022 split; the new Papua provinces are
+      inside Papua). province_id = BPS code. production_center_commodities (extra) lists
+      the v1 commodities the province is a main producer of (seed, unverified).
+    columns:
+      - name: province_id
+        data_tests: [unique, not_null]
+
+  - name: dim_city
+    description: PIHPS cities (regencies) and which market tiers each one reports.
+    columns:
+      - name: city_id
+        data_tests: [unique, not_null]
+      - name: province_id
+        data_tests: [not_null]
+
+  - name: dim_market_tier
+    columns:
+      - name: market_tier
+        data_tests: [unique, not_null]
+
+  - name: fct_daily_price
+    description: >
+      Central fact. Median price across reporting cities per date x commodity x province
+      x market tier, on PIHPS publishing days only (weekdays, no holidays).
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_id, province_id, market_tier]}
+      - province_coverage:
+          config: {severity: warn}
+    columns:
+      - name: date
+        data_tests:
+          - not_null
+          - fresh_within_working_days
+      - name: price_idr
+        data_tests: [not_null]
+      - name: n_cities
+        data_tests: [not_null]
+      - name: is_imputed
+        data_tests: [not_null]
+
+  - name: fct_price_change
+    description: >
+      Changes and volatility per series. 1d = vs previous published day; 7d/28d = vs the
+      latest price on or before date-7/-28 calendar days (NULL if that price is stale).
+      Percentages are decimals.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_id, province_id, market_tier]}
+
+  - name: fct_margin_chain
+    description: >
+      Producer, wholesale and retail (traditional) prices side by side per date x
+      commodity x province. Ratios are decimals; NULL when a tier is missing.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_id, province_id]}
+      - tier_order:
+          config: {severity: warn}

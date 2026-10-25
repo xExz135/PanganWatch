@@ -1,0 +1,22 @@
+commodity_id,name_id,name_en,commodity_group,unit,perishability_days,is_imported,is_v1
+cabai_rawit_merah,Cabai Rawit Merah,Red bird's-eye chili,chili,kg,5,false,true
+cabai_merah_keriting,Cabai Merah Keriting,Curly red chili,chili,kg,5,false,true
+bawang_merah,Bawang Merah Ukuran Sedang,Shallot (medium),onion,kg,30,false,true
+bawang_putih,Bawang Putih Ukuran Sedang,Garlic (medium),onion,kg,60,true,true
+beras_medium_1,Beras Kualitas Medium I,Rice (medium I),rice,kg,180,false,true
+telur_ayam_ras,Telur Ayam Ras Segar,Chicken eggs,protein,kg,14,false,true
+daging_ayam_ras,Daging Ayam Ras Segar,Broiler chicken meat,protein,kg,2,false,true
+minyak_goreng_curah,Minyak Goreng Curah,Cooking oil (bulk),oil,liter,365,false,true
+beras_bawah_1,Beras Kualitas Bawah I,Rice (low I),rice,kg,180,false,false
+beras_bawah_2,Beras Kualitas Bawah II,Rice (low II),rice,kg,180,false,false
+beras_medium_2,Beras Kualitas Medium II,Rice (medium II),rice,kg,180,false,false
+beras_super_1,Beras Kualitas Super I,Rice (premium I),rice,kg,180,false,false
+beras_super_2,Beras Kualitas Super II,Rice (premium II),rice,kg,180,false,false
+daging_sapi_1,Daging Sapi Kualitas 1,Beef (grade 1),protein,kg,2,true,false
+daging_sapi_2,Daging Sapi Kualitas 2,Beef (grade 2),protein,kg,2,true,false
+cabai_merah_besar,Cabai Merah Besar,Large red chili,chili,kg,5,false,false
+cabai_rawit_hijau,Cabai Rawit Hijau,Green bird's-eye chili,chili,kg,5,false,false
+minyak_goreng_kemasan_1,Minyak Goreng Kemasan Bermerk 1,Cooking oil (branded 1),oil,liter,365,false,false
+minyak_goreng_kemasan_2,Minyak Goreng Kemasan Bermerk 2,Cooking oil (branded 2),oil,liter,365,false,false
+gula_pasir_premium,Gula Pasir Kualitas Premium,Sugar (premium),sugar,kg,365,true,false
+gula_pasir_lokal,Gula Pasir Lokal,Sugar (local),sugar,kg,365,true,false

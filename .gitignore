@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+logs/
+
+# Data: bronze is archived to GitHub Releases, not committed (spec §13).
+data/bronze/
+data/*.duckdb
+data/*.duckdb.wal
+# The sample DB IS committed (TEAM.md §3.5).
+!data/sample/panganwatch_sample.duckdb
+dbt/.user.yml
