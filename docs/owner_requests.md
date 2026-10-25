@@ -25,4 +25,6 @@ Questions about spec, scope, contract or dependencies. Each role edits only its 
 
 ## Data Analyst
 
+1. **Dependency — dashboard.** Add `streamlit` and `plotly` (spec §5 tech stack) for `dashboard/`. **Approved by owner 2026-10-25; added by DE** as the optional group `.[dashboard]` so the daily pipeline doesn't install them. Streamlit Community Cloud installs from `dashboard/requirements.txt`.
+
 ## Data Scientist

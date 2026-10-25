@@ -30,4 +30,12 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 
 ## Data Analyst
 
+- **2026-10-25 — Money shown as `Rp 45,000` (English separators).** The UI is English and percentages use a decimal point; `Rp 45.000` next to `+12.3%` invites misreading. Spec allows either if consistent; formatting lives only in `dashboard/common.py`.
+- **2026-10-25 — Dashboard pages in `dashboard/views/`, not `dashboard/pages/`.** A `pages/` folder triggers Streamlit's automatic navigation, which overrode `st.navigation` (wrong titles, layout ignored).
+- **2026-10-25 — Page 1 watch list uses the spec's model-free alert rules until Phase 4.** High = 7-day change > 20 %; Watch = > 2 SD above the 28-day mean (spec §12). Model spike risk replaces it once `fct_spike_risk` exists.
+- **2026-10-25 — Province map uses one dot per province (at its capital), not a filled choropleth.** No province boundary file is in the repo yet, and the dots keep the same diverging color story. Swap to a choropleth if a licensed GeoJSON is added.
+- **2026-10-25 — Price up = red on cards (`delta_color="inverse"`).** The audience is a buyer: a rise is bad news.
+- **2026-10-25 — Colors from the dataviz reference palette, validated.** 4 tier colors pass colorblind and normal-vision separation in light and dark; light-mode contrast is low for two, so every line is direct-labeled and every chart has a table view. Dark mode has its own sequential direction (low end recedes into the dark surface).
+- **2026-10-25 — Persona split of "chili 8 kg/day" into 3 kg rawit + 5 kg keriting.** The spec gives one chili figure but models two chilies; the split is an assumption in `config/persona.yaml`.
+
 ## Data Scientist

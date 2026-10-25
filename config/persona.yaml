@@ -1,0 +1,67 @@
+# Procurement persona (spec §11 D2). Owner: Data Analyst.
+#
+# EVERY NUMBER HERE IS AN ASSUMPTION, not measured data. They describe one illustrative
+# kitchen so the decision layer has something concrete to optimise. The dashboard prints
+# them; change a value and every result that uses it changes.
+# Changing a value after Week 10 invalidates published savings figures: file an
+# own-mistake report so DS re-runs the savings backtest (data-analyst.md).
+
+persona:
+  name: "1,000-meal catering kitchen / MBG kitchen (SPPG)"
+  province_id: 31                # DKI Jakarta (BPS code, see dim_province)
+  meals_per_day: 1000
+  operating_days_per_week: 7     # assumption: meals served every day
+  monthly_food_budget_idr: 250000000   # ~Rp 8.3M/day; ~5% headroom over base-case cost
+
+  # Purchase price tier. The spec says province retail (traditional market); a kitchen of
+  # this size could buy wholesale, so "wholesale" is a sensible sensitivity case.
+  price_tier: traditional
+
+commodities:
+  # daily_demand: in the commodity's unit (kg; liter for oil).
+  # storage_days: how many days of demand can be stored at most.
+  # holding_cost_pct_per_day: holding + spoilage cost, as a decimal share of the
+  #   purchase value lost per day of storage (0.03 = 3 % per day).
+  cabai_rawit_merah:
+    daily_demand: 3              # spec gives "chili 8 kg"; split 3 rawit / 5 keriting
+    storage_days: 5
+    holding_cost_pct_per_day: 0.030   # fresh chili wilts fast
+    note: "Spec: chili 8 kg/day total, storage 5 days. Split between the two v1 chilies is an assumption."
+  cabai_merah_keriting:
+    daily_demand: 5
+    storage_days: 5
+    holding_cost_pct_per_day: 0.030
+  bawang_merah:
+    daily_demand: 10
+    storage_days: 21
+    holding_cost_pct_per_day: 0.005
+  bawang_putih:
+    daily_demand: 5
+    storage_days: 45
+    holding_cost_pct_per_day: 0.002
+  beras_medium_1:
+    daily_demand: 120
+    storage_days: 30
+    holding_cost_pct_per_day: 0.0005
+  telur_ayam_ras:
+    daily_demand: 60
+    storage_days: 10
+    holding_cost_pct_per_day: 0.005
+  daging_ayam_ras:
+    daily_demand: 80
+    storage_days: 3              # fresh; spec allows 14 if frozen
+    storage_days_frozen: 14
+    holding_cost_pct_per_day: 0.020
+    note: "Freezing extends storage to 14 days but lowers quality; base case is fresh."
+  minyak_goreng_curah:
+    daily_demand: 25             # liters
+    storage_days: 60
+    holding_cost_pct_per_day: 0.0003
+
+# Budget simulator (D5): allowed ingredient swaps when one price spikes.
+# max_share = the largest share of the original ingredient's demand the substitute may
+# take over (assumption: menus can't swap everything).
+substitutions:
+  - {from: cabai_rawit_merah, to: cabai_merah_keriting, max_share: 0.5}
+  - {from: cabai_merah_keriting, to: cabai_rawit_merah, max_share: 0.3}
+  - {from: daging_ayam_ras, to: telur_ayam_ras, max_share: 0.25}
