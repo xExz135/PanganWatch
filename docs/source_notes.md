@@ -62,6 +62,7 @@ Cities per tier (2026-10-25): traditional 110, modern 78, wholesale 75, producer
 
 - Single-city typos exist and are caught as warnings: e.g. premium rice in one city 11,900 → 34,400 → 11,900 on consecutive days; beef at Rp 455,000/kg. The province median absorbs them.
 - **2022 cooking-oil crisis shows up as out-of-bounds prices:** branded oil (`minyak_goreng_kemasan_1`) in Kota Kendari and Kota Bau-Bau (Sulawesi Tenggara) went from ~Rp 22,000 to Rp 55,000–57,000 in Mar 2022 and eased back to ~Rp 24,000 by Oct 2022 (Kota Parepare: one day at 88,250). The gradual path looks real, but some reports may be 2-liter pack prices. Kept as reported (warn only); not a v1 commodity. Analyses of branded oil in 2022 should check these cities.
+- **Cities join PIHPS mid-series** (checked on the full traditional-tier history, 2026-10-25). Five joins since 2022: Sulawesi Tengah (2022-12-15), Kab. Gorontalo (2024-01-15), Kab. Nabire and Kab. Jayawijaya in Papua (2025-03-20), Kab. Badung and Kab. Tabanan in Bali (2025-09-01), Kab. Nunukan in Kalimantan Utara (2026-05-01). Because a province price is the median of reporting cities, a join can move it with no real price change. Measured on the join day, the median commodity moved 0–3%, the largest single move was 20% (Kalimantan Utara); none crossed the 20% alert rule. Small enough to keep the plain median; `n_cities` shows when the city set changes. Cities that stop reporting were not checked.
 
 ## S3 — BPS WebAPI (CPI)
 

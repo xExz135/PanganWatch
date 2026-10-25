@@ -29,7 +29,7 @@ jobs:
         working-directory: dbt
         run: |
           cp ../data/sample/panganwatch_sample.duckdb /tmp/sample.duckdb
-          PANGANWATCH_DB=/tmp/sample.duckdb dbt build --profiles-dir . --select "seeds marts"
+          PANGANWATCH_DB=/tmp/sample.duckdb dbt build --profiles-dir . --select "resource_type:seed marts"
 
   ownership:
     # TEAM.md §4: a PR may touch only paths its author role owns (by branch prefix).
