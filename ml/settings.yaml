@@ -1,0 +1,35 @@
+# Data Scientist settings. Code reads every tunable number from here.
+
+target:
+  # Forecast target: retail price in traditional markets (persona tier, widest coverage).
+  market_tier: traditional
+  series_keys: [commodity_id, province_id]
+
+backtest:
+  # Rolling origin: one cutoff every 4 weeks over the last 12 months (~13 cutoffs).
+  n_cutoffs: 13
+  cutoff_step_days: 28
+  # Last part of each fold's training data, held out for early stopping / tuning.
+  validation_days: 56
+  # Forecasts are issued every calendar day, like the daily job.
+  origin_every_days: 1
+  horizons: [1, 7, 14, 28]
+  quantiles: [0.1, 0.5, 0.9]
+
+baselines:
+  # A series whose last price is older than this is not forecast (dead or paused series).
+  max_staleness_days: 14
+
+metrics:
+  # Seasonal period for the seasonal-naive baseline and the MASE scale, in calendar days.
+  season_days: 7
+  # Gate 3 (owner-approved 2026-10-25): error ratio against these baselines, per series.
+  # baseline model_name -> {error kind: metric name in fct_model_metrics}.
+  # relrmse_naive is report-only (big misses); the gate uses relmae_naive.
+  relative_to:
+    naive: {mae: relmae_naive, rmse: relrmse_naive}
+    seasonal_naive: {mae: relmae_snaive}
+
+segments:
+  # ramadan_lebaran = target date inside Ramadan or up to this many days after Lebaran.
+  post_lebaran_days: 7
