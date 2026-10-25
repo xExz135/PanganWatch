@@ -11,12 +11,16 @@ Questions about spec, scope, contract or dependencies. Each role edits only its 
 5. **Spec — data publishes weekdays only.** `fct_daily_price` has no weekend or holiday rows. DS lag features (t−1, t−7 …) and the D4 backtest ("buy each day") need to decide calendar vs published days. Suggest calendar days with as-of lookups, as `fct_price_change` does.
 6. **Spec — `stg_weather_forecast` (S5) cannot be trained on.** BMKG keeps no forecast history, so any model feature built from it exists only in production (train/serve skew). Suggest dropping S5 from model features, or archiving forecasts from now and using them only after ~1 year.
 7. **Spec — forecast gate baseline.** MASE vs seasonal-naive is an easy bar for 7–14-day food prices; the plain naive forecast is usually harder to beat. Suggest Gate 3 also require beating naive.
-8. **Spec — publishing the DuckDB file by daily git commit** will bloat the repo (each commit keeps a full binary copy; GitHub blocks files > 100 MB). Suggest MotherDuck free tier or a GitHub Release asset. Decision needed before Week 4.
-9. **Decision — where the daily job runs (blocks `daily.yml`).** geo-probe passed (2026-10-25), so all three options are open. Depends on #8, because a GitHub-hosted runner starts empty every day: bronze history (~400 MB) and the database must be restored before each run and saved after. Options:
-   - **(a) Laptop / self-hosted runner** (spec fallback): data stays on disk, nothing to restore. Needs the laptop on at 14:00 WIB. Simplest; also the only option if geo-probe fails.
-   - **(b) GitHub-hosted + Release assets:** restore DB + bronze archive from a Release each run, upload after. Free, ~1–2 min extra per run.
-   - **(c) GitHub-hosted + MotherDuck:** DB lives in MotherDuck; bronze archived to Releases. Cleanest for the dashboard; one more account.
-   `python -m ingestion.daily_pipeline` already works the same in all three.
+8. ~~**Spec — publishing the DuckDB file by daily git commit** will bloat the repo.~~ **Decided 2026-10-25:** publish to the `data` GitHub Release instead (see #9).
+9. ~~**Decision — where the daily job runs.**~~ **Decided 2026-10-25:** GitHub-hosted runner (geo-probe passed) + GitHub Release assets for storage. `daily.yml` and `weekly_retrain.yml` are written; the schedule waits for #11.
+10. **Owner action — verify the fuel seed.** `dbt/seeds/fuel_price_events.csv` has the 2022 changes only, from memory (`verified=false`). Add any later Pertalite/Solar changes.
+11. **Owner action — switch the daily job on (once the local backfill finishes).** One-time:
+    1. Install the GitHub CLI and log in: `winget install GitHub.cli`, then `gh auth login`.
+    2. From the repo root: `.venv\Scripts\python -m ingestion.archive pack --out out --all` and `.venv\Scripts\python -m ingestion.archive pack-db --out out`.
+    3. `gh release create data out/* --title "Pipeline data" --notes "Raw archives and the published database."`
+    4. GitHub → Settings → Secrets and variables → Actions → **Variables** → new variable `PIPELINE_ENABLED` = `true`.
+    5. Actions → **daily** → Run workflow once to check it end to end.
+12. **Spec — public vs private repo.** The repo is private. Release assets of a private repo need a token to download, so the Streamlit dashboard would need a GitHub token secret. Making the repo public (as the spec intends) removes that, and makes Actions minutes unlimited.
 10. **Owner action — verify the fuel seed.** `dbt/seeds/fuel_price_events.csv` has the 2022 changes only, from memory (`verified=false`). Add any later Pertalite/Solar changes.
 
 ## Data Analyst

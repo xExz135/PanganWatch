@@ -114,5 +114,25 @@ def test_pipeline_log_maps_tests_to_layers(tmp_path):
     ]
 
 
+def test_relogged_run_replaces_earlier_entry(tmp_path):
+    import duckdb
+
+    log_dir = tmp_path / "pipeline"
+    base = {"started_at": "2026-10-25T07:00:00+00:00", "finished_at": "2026-10-25T07:30:00+00:00",
+            "rows_loaded": 1, "requests_failed": 0, "tests_failed": 0, "tests_warned": 0,
+            "notes": ""}
+    pipeline_log.append_jsonl(log_dir / "_runs.jsonl", [
+        {**base, "run_id": "r1", "status": "failed", "logged_at": "2026-10-25T07:30:00+00:00"},
+        {**base, "run_id": "r1", "status": "success", "logged_at": "2026-10-25T08:00:00+00:00"},
+        {**base, "run_id": "r2", "status": "success", "logged_at": "2026-10-26T07:30:00+00:00"},
+    ])
+    db = str(tmp_path / "t.duckdb")
+    pipeline_log.rebuild_tables(db, log_dir=log_dir)
+    con = duckdb.connect(db, read_only=True)
+    assert con.sql("select run_id, status from fct_pipeline_runs order by run_id").fetchall() \
+        == [("r1", "success"), ("r2", "success")]
+    assert con.execute("select count(*) from fct_test_results").fetchone() == (0,)
+
+
 def test_pipeline_log_without_build_output(tmp_path):
     assert pipeline_log.test_rows("r1", target=tmp_path) == []

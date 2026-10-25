@@ -1,0 +1,60 @@
+# Weekly jobs, Sunday 16:00 WIB (09:00 UTC), after the daily run: TEAM.md §3.3.
+#   ml.train -> decision.savings_backtest (DS), analytics.run (DA)
+# Each step is skipped while its module doesn't exist yet. Same restore / publish
+# pattern as daily.yml.
+name: weekly
+
+on:
+  schedule:
+    - cron: "0 9 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-release
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    if: github.event_name == 'workflow_dispatch' || vars.PIPELINE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYTHONUTF8: "1"
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+      GH_TOKEN: ${{ github.token }}
+      DATA_TAG: data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+
+      - name: Restore the published database
+        run: |
+          mkdir -p dist
+          gh release download "$DATA_TAG" --dir dist --pattern 'panganwatch.duckdb.gz'
+          python -m ingestion.archive unpack --src dist
+
+      - name: Weekly entry points
+        run: |
+          set -e
+          run_if_present () {
+            if python -c "import importlib.util,sys; sys.exit(importlib.util.find_spec('$1') is None)" 2>/dev/null; then
+              echo "::group::python -m $*"; python -m "$@"; echo "::endgroup::"
+            else
+              echo "skip $1 (module not built yet)"
+            fi
+          }
+          run_if_present ml.train
+          run_if_present decision.savings_backtest
+          run_if_present analytics.run
+
+      - name: Publish database
+        run: |
+          python -m ingestion.archive pack-db --out out
+          gh release upload "$DATA_TAG" out/panganwatch.duckdb.gz --clobber

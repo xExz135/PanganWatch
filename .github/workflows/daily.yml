@@ -1,0 +1,77 @@
+# Daily pipeline, 14:00 WIB (07:00 UTC). TEAM.md §3.3 order, via ingestion.daily_pipeline.
+# Data lives in the `data` GitHub Release between runs (docs/decisions.md):
+#   restore -> run -> always save raw data -> publish the DB only if the run passed.
+# The schedule is off until the repo variable PIPELINE_ENABLED is "true" (set it once the
+# local backfill has been uploaded; see docs/owner_requests.md). Manual runs always work.
+name: daily
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Run date YYYY-MM-DD (default: today WIB)"
+        required: false
+
+permissions:
+  contents: write   # upload Release assets
+
+concurrency:
+  group: data-release   # never two jobs writing the same assets
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    if: github.event_name == 'workflow_dispatch' || vars.PIPELINE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      PYTHONUTF8: "1"
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+      PANGANWATCH_ENFORCE_FRESHNESS: "true"
+      BPS_API_KEY: ${{ secrets.BPS_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      DATA_TAG: data
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Restore data from the release
+        run: |
+          mkdir -p dist
+          if gh release view "$DATA_TAG" >/dev/null 2>&1; then
+            gh release download "$DATA_TAG" --dir dist --pattern '*'
+          else
+            echo "::warning::release '$DATA_TAG' not found; starting with empty data"
+          fi
+          python -m ingestion.archive unpack --src dist
+
+      - name: Run pipeline
+        run: |
+          if [ -n "${{ inputs.date }}" ]; then
+            python -m ingestion.daily_pipeline --date "${{ inputs.date }}"
+          else
+            python -m ingestion.daily_pipeline
+          fi
+
+      - name: Save raw data (always, so nothing fetched is lost)
+        if: always()
+        run: |
+          python -m ingestion.archive pack --out out
+          gh release view "$DATA_TAG" >/dev/null 2>&1 || \
+            gh release create "$DATA_TAG" --title "Pipeline data" \
+              --notes "Raw archives and the published database. Updated by the daily workflow."
+          gh release upload "$DATA_TAG" out/bronze-*.tar.gz --clobber
+
+      - name: Publish database (only when every error-level test passed)
+        run: |
+          python -m ingestion.archive pack-db --out out
+          gh release upload "$DATA_TAG" out/panganwatch.duckdb.gz --clobber

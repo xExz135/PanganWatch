@@ -1,7 +1,9 @@
 """Record a pipeline run and its dbt test results (fct_pipeline_runs, fct_test_results).
 
 Runs after `dbt build` (pass or fail) and reads dbt/target/run_results.json + manifest.json.
-Both tables are append-only and written here, not by dbt, so a failed build still logs.
+Rows are appended to data/bronze/pipeline/_runs.jsonl and _test_results.jsonl (the source
+of truth, archived with bronze even when a run fails), then both tables are rebuilt from
+those files. Written here, not by dbt, so a failed build still logs.
 
     python -m ingestion.pipeline_log --run-id 123 --started-at 2026-10-25T07:00:00+00:00 \
         --status success [--notes "..."]
@@ -23,19 +25,20 @@ from ingestion.config import BRONZE_DIR, DATA_DIR, ROOT
 log = logging.getLogger(__name__)
 
 TARGET = ROOT / "dbt" / "target"
+LOG_DIR = BRONZE_DIR / "pipeline"
 LAYER_BY_FOLDER = {"staging": "silver", "marts": "gold", "ml": "ml", "analyses": "analyses"}
 
-DDL = """
-create table if not exists fct_pipeline_runs (
-    run_id varchar primary key, started_at timestamptz, finished_at timestamptz,
-    status varchar, rows_loaded bigint, requests_failed bigint, tests_failed integer,
-    tests_warned integer, notes varchar
-);
-create table if not exists fct_test_results (
-    run_id varchar, run_at timestamptz, test_name varchar, model_name varchar,
-    layer varchar, severity varchar, status varchar, failures bigint
-);
-"""
+RUN_COLUMNS = {
+    "run_id": "VARCHAR", "started_at": "TIMESTAMPTZ", "finished_at": "TIMESTAMPTZ",
+    "status": "VARCHAR", "rows_loaded": "BIGINT", "requests_failed": "BIGINT",
+    "tests_failed": "INTEGER", "tests_warned": "INTEGER", "notes": "VARCHAR",
+    "logged_at": "TIMESTAMPTZ",
+}
+TEST_COLUMNS = {
+    "run_id": "VARCHAR", "run_at": "TIMESTAMPTZ", "test_name": "VARCHAR",
+    "model_name": "VARCHAR", "layer": "VARCHAR", "severity": "VARCHAR", "status": "VARCHAR",
+    "failures": "BIGINT", "logged_at": "TIMESTAMPTZ",
+}
 
 
 def test_rows(run_id: str, target: Path = TARGET) -> list[dict]:
@@ -96,26 +99,53 @@ def main() -> int:
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    tests = test_rows(args.run_id)
+    now = datetime.now(UTC).isoformat()
+    tests = [{**t, "logged_at": now} for t in test_rows(args.run_id)]
     loaded, req_failed = rows_loaded_since(args.started_at)
-    con = duckdb.connect(args.db)
-    con.execute(DDL)
-    con.execute("delete from fct_test_results where run_id = ?", [args.run_id])  # idempotent
-    con.execute("delete from fct_pipeline_runs where run_id = ?", [args.run_id])
-    if tests:
-        con.executemany(
-            "insert into fct_test_results values (?, ?, ?, ?, ?, ?, ?, ?)",
-            [list(t.values()) for t in tests],
-        )
-    con.execute(
-        "insert into fct_pipeline_runs values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [args.run_id, args.started_at, datetime.now(UTC), args.status, loaded, req_failed,
-         sum(t["status"] == "fail" for t in tests), sum(t["status"] == "warn" for t in tests),
-         args.notes],
-    )
-    con.close()
+    run = {
+        "run_id": args.run_id, "started_at": args.started_at.isoformat(), "finished_at": now,
+        "status": args.status, "rows_loaded": loaded, "requests_failed": req_failed,
+        "tests_failed": sum(t["status"] == "fail" for t in tests),
+        "tests_warned": sum(t["status"] == "warn" for t in tests),
+        "notes": args.notes, "logged_at": now,
+    }
+    append_jsonl(LOG_DIR / "_runs.jsonl", [run])
+    append_jsonl(LOG_DIR / "_test_results.jsonl", tests)
+    rebuild_tables(args.db)
     log.info("logged run %s: %s, %s rows, %s tests", args.run_id, args.status, loaded, len(tests))
     return 0
+
+
+def append_jsonl(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
+
+
+def rebuild_tables(db: str, log_dir: Path = LOG_DIR) -> None:
+    """Recreate both tables from the JSONL logs. A re-logged run_id keeps its latest entry."""
+    con = duckdb.connect(db)
+    for table, file, cols, key in [
+        ("fct_pipeline_runs", "_runs.jsonl", RUN_COLUMNS, "run_id"),
+        ("fct_test_results", "_test_results.jsonl", TEST_COLUMNS, "run_id, test_name"),
+    ]:
+        path = log_dir / file
+        col_list = ", ".join(cols)
+        if not path.exists() or path.stat().st_size == 0:
+            ddl = ", ".join(f"{c} {t}" for c, t in cols.items())
+            con.execute(f"create or replace table {table} ({ddl})")
+            continue
+        spec = "{" + ", ".join(f"{c}: '{t}'" for c, t in cols.items()) + "}"
+        # all entries of the latest logging of a run (a re-run replaces the earlier one)
+        con.execute(f"""
+            create or replace table {table} as
+            select {col_list} from read_json('{path.as_posix()}',
+                format = 'newline_delimited', columns = {spec})
+            qualify logged_at = max(logged_at) over (partition by run_id)
+                and row_number() over (partition by {key} order by logged_at desc) = 1
+        """)
+    con.close()
 
 
 if __name__ == "__main__":
