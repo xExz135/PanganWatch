@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: dim_reference_price
+    description: >
+      Government reference prices for the v1 commodities, one row per commodity x province
+      x validity period, expanded from seeds/reference_prices.csv. HAP = harga acuan
+      penjualan di tingkat konsumen (Bapanas, earlier Kemendag); HET = harga eceran
+      tertinggi (rice, bulk cooking oil). Where the regulation gives a range, price_idr is
+      the upper bound and price_idr_low the lower bound.
+      Region -> province map (BPS codes), following the regulations' wording:
+      jawa_lampung_sumsel = 31-36, 16, 18; sumatera_lain = 11-15, 17, 19, 21;
+      bali_ntb = 51, 52; ntt = 53; kalimantan = 61-65; sulawesi = 71-76;
+      maluku = 81, 82; papua = 91, 94 (PIHPS keeps the pre-2022 Papua provinces);
+      national = every province in dim_province.
+      Gaps are real: no chili or shallot reference before 20 Dec 2022, no garlic reference
+      before 26 Sep 2024, no bulk-oil ceiling before 1 Feb 2022 or after 12 Aug 2024.
+      source_kind = press_report marks values checked against news reports because the
+      official text or its lampiran is not online (Permendag 57/2017, Permendag 7/2020,
+      the 2024 rice relaxation, Kepbadan 299/2025).
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, province_id, valid_from]}
+    columns:
+      - name: commodity_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_commodity'), field: commodity_id}
+      - name: province_id
+        description: NULL means the seed used a region name this model does not know.
+        data_tests: [not_null]
+      - name: valid_from
+        data_tests: [not_null]
+      - name: valid_to
+        description: Last day in force (inclusive); NULL = still in force.
+      - name: price_type
+        data_tests:
+          - accepted_values:
+              arguments: {values: [HAP, HET]}
+      - name: price_idr
+        data_tests: [not_null]
+      - name: source_url
+        data_tests: [not_null]
+      - name: source_kind
+        data_tests:
+          - accepted_values:
+              arguments: {values: [regulation_text, press_report]}
+      - name: overlaps_other_period
+        description: True if another period for the same commodity x province overlaps.
+        data_tests: [is_false]

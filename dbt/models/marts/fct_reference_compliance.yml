@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: fct_reference_compliance
+    description: >
+      Retail price against the reference in force that day, per date x commodity x
+      province x retail tier (traditional, modern). Rows exist only where both a PIHPS
+      price and a reference exist. pct_above = retail_price / reference_price - 1
+      (decimal, negative when below). is_above = retail_price > reference_price.
+      consecutive_days_above = published days in a row above the reference up to this
+      date (weekends, holidays and missing days are skipped, not counted as breaks), 0 when
+      not above. regulation names the source of the reference (see dim_reference_price).
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_id, province_id, market_tier]}
+    columns:
+      - name: retail_price
+        data_tests: [not_null]
+      - name: reference_price
+        data_tests: [not_null]
+      - name: pct_above
+        data_tests: [not_null]
+      - name: is_above
+        data_tests: [not_null]
+      - name: consecutive_days_above
+        data_tests: [not_null]
+      - name: regulation
+        data_tests: [not_null]
+
+unit_tests:
+  - name: compliance_streaks_reset_and_follow_reference_changes
+    description: >
+      Streak counts published days above, resets at or below the reference (equal is not
+      above), ignores wholesale prices, and switches reference on the new valid_from.
+    model: fct_reference_compliance
+    given:
+      - input: ref('fct_daily_price')
+        rows:
+          - {date: 2024-01-01, commodity_id: x, province_id: 31, market_tier: traditional, price_idr: 110}
+          - {date: 2024-01-02, commodity_id: x, province_id: 31, market_tier: traditional, price_idr: 120}
+          - {date: 2024-01-05, commodity_id: x, province_id: 31, market_tier: traditional, price_idr: 100}
+          - {date: 2024-01-08, commodity_id: x, province_id: 31, market_tier: traditional, price_idr: 130}
+          - {date: 2024-01-09, commodity_id: x, province_id: 31, market_tier: traditional, price_idr: 130}
+          - {date: 2024-01-09, commodity_id: x, province_id: 31, market_tier: wholesale, price_idr: 999}
+      - input: ref('dim_reference_price')
+        rows:
+          - {commodity_id: x, province_id: 31, valid_from: 2023-01-01, valid_to: 2024-01-08, price_idr: 100, price_type: HAP, regulation: old}
+          - {commodity_id: x, province_id: 31, valid_from: 2024-01-09, valid_to: null, price_idr: 140, price_type: HAP, regulation: new}
+    expect:
+      rows:
+        - {date: 2024-01-01, market_tier: traditional, reference_price: 100, is_above: true, consecutive_days_above: 1, regulation: old}
+        - {date: 2024-01-02, market_tier: traditional, reference_price: 100, is_above: true, consecutive_days_above: 2, regulation: old}
+        - {date: 2024-01-05, market_tier: traditional, reference_price: 100, is_above: false, consecutive_days_above: 0, regulation: old}
+        - {date: 2024-01-08, market_tier: traditional, reference_price: 100, is_above: true, consecutive_days_above: 1, regulation: old}
+        - {date: 2024-01-09, market_tier: traditional, reference_price: 140, is_above: false, consecutive_days_above: 0, regulation: new}

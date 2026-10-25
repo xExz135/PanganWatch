@@ -37,5 +37,11 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-25 — Price up = red on cards (`delta_color="inverse"`).** The audience is a buyer: a rise is bad news.
 - **2026-10-25 — Colors from the dataviz reference palette, validated.** 4 tier colors pass colorblind and normal-vision separation in light and dark; light-mode contrast is low for two, so every line is direct-labeled and every chart has a table view. Dark mode has its own sequential direction (low end recedes into the dark surface).
 - **2026-10-25 — Persona split of "chili 8 kg/day" into 3 kg rawit + 5 kg keriting.** The spec gives one chili figure but models two chilies; the split is an assumption in `config/persona.yaml`.
+- **2026-10-25 — Reference prices only from a traceable source, one per row.** Each row in `reference_prices.csv` names its regulation and links the official text, or a news report when no official copy is online (flagged `press_report`). Where nothing could be verified there is no row, so no compliance is computed: shallots before 20 Dec 2022, chili before 20 Dec 2022 (no reference existed), garlic before 26 Sep 2024 (first reference), bulk oil before 1 Feb 2022.
+- **2026-10-25 — Bulk cooking oil has no ceiling after 12 Aug 2024.** Permendag 18/2024 sets the HET for Minyakita only; PIHPS's bulk oil (`curah`) is not Minyakita, so comparing it to 15,700 would be wrong.
+- **2026-10-25 — A HAP range is compared on its upper bound.** Chili and shallot references are ranges (e.g. bird's-eye chili 40,000–57,000); "above the reference" means above the top. The lower bound is kept as `price_idr_low`.
+- **2026-10-25 — Compliance uses the traditional and modern retail tiers.** Consumer references apply to retail sales; producer and wholesale prices are left out.
+- **2026-10-25 — Streaks count published days.** PIHPS skips weekends and holidays, so `consecutive_days_above` counts days with a price, and a weekend does not break a streak.
+- **2026-10-25 — Region-to-province map lives in `dim_reference_price`, not a second seed.** Regulations name regions ("Jawa, Lampung dan Sumatera Selatan"); the map follows their wording and is documented in the model's `.yml`. Rice zones changed in 2025 (Sulawesi moved to zone 2), so the seed lists regions per regulation rather than fixed zone numbers.
 
 ## Data Scientist

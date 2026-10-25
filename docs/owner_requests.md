@@ -21,10 +21,11 @@ Questions about spec, scope, contract or dependencies. Each role edits only its 
     4. GitHub → Settings → Secrets and variables → Actions → **Variables** → new variable `PIPELINE_ENABLED` = `true`.
     5. Actions → **daily** → Run workflow once to check it end to end.
 12. **Spec — public vs private repo.** The repo is private. Release assets of a private repo need a token to download, so the Streamlit dashboard would need a GitHub token secret. Making the repo public (as the spec intends) removes that, and makes Actions minutes unlimited.
-10. **Owner action — verify the fuel seed.** `dbt/seeds/fuel_price_events.csv` has the 2022 changes only, from memory (`verified=false`). Add any later Pertalite/Solar changes.
 
 ## Data Analyst
 
 1. **Dependency — dashboard.** Add `streamlit` and `plotly` (spec §5 tech stack) for `dashboard/`. **Approved by owner 2026-10-25; added by DE** as the optional group `.[dashboard]` so the daily pipeline doesn't install them. Streamlit Community Cloud installs from `dashboard/requirements.txt`.
+2. **Owner check — reference prices taken from news reports.** `dbt/seeds/reference_prices.csv` cites the official text for most rows. Four sources had no official copy online, so their values were checked against news reports (`source_kind = press_report`): Permendag 57/2017 (rice before Mar 2023), Permendag 7/2020 (eggs and chicken before Oct 2022), the 2024 rice relaxation letters, and Kepbadan 299/2025 (current rice ceiling). If you can get the official PDFs, send them and I will swap the links. Also: in Feb 2026 the Ombudsman asked Bapanas to revoke Kepbadan 299/2025; I found no sign it was revoked, so the seed treats it as still in force.
+3. **Contract — extra columns (own tables).** `dim_reference_price`: `zone`, `price_idr_low` (lower end of a HAP range), `unit`, `regulation`, `source_kind`, `note`, `overlaps_other_period`. `fct_reference_compliance`: `market_tier` (traditional and modern, both retail), `price_type`, `regulation`. No other role's tables change.
 
 ## Data Scientist
