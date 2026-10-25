@@ -24,6 +24,8 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-25 — Daily job on GitHub-hosted runners, data kept in the `data` Release (owner decision).** Each run restores, runs, uploads. Raw data is stored as one archive per fetch month, so a run re-uploads only the current month. Raw archives are saved even when a run fails; the database is published only when every error-level test passes. Free, and git history stays small. Not MotherDuck: no extra account. Not the laptop: it would have to be on daily.
 - **2026-10-25 — Run log kept as JSONL beside bronze, tables rebuilt from it.** A failed run never publishes the database, so a log stored only in the DB would lose failures; the JSONL travels with the raw archives.
 - **2026-10-25 — Schedule off until `PIPELINE_ENABLED=true`.** If the scheduled job ran before the local backfill was uploaded, it would publish a month archive that the backfill upload would then overwrite.
+- **2026-10-25 — Architecture diagram as Mermaid in the README, not `docs/architecture.png`.** GitHub renders it, it is diffable and can't drift from a binary copy. A PNG can be exported from it for the write-up if needed.
+- **2026-10-25 — Missing sources give empty bronze views, not errors.** A fresh checkout without a BPS key still builds; tested.
 - **2026-10-25 — Staging rebuilds fully from bronze each run (for now).** Simple and always correct; fine at today's ~2,000 files. Switch `stg_pihps_price` to incremental when the build passes ~5 minutes.
 
 ## Data Analyst

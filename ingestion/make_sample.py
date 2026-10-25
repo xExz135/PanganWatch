@@ -20,6 +20,7 @@ PROVINCES = [31, 35, 12]  # DKI Jakarta, Jawa Timur, Sumatera Utara
 COMMODITIES = ["cabai_rawit_merah", "bawang_merah", "beras_medium_1"]
 MIN_DAYS = 400
 
+# Every DE contract table (TEAM.md §2) except the bronze_* views, which read raw files.
 # table -> filter (None = copy whole table)
 TABLES: dict[str, str | None] = {
     "dim_date": None,
@@ -28,9 +29,14 @@ TABLES: dict[str, str | None] = {
     "dim_city": None,
     "dim_market_tier": None,
     "stg_pihps_price": "province_id in {p} and commodity_id in {c}",
+    "stg_cpi": "province_id in {p} or region_level = 'national'",
+    "stg_weather": "province_id in {p}",
+    "stg_fx": None,
     "fct_daily_price": "province_id in {p} and commodity_id in {c}",
     "fct_price_change": "province_id in {p} and commodity_id in {c}",
     "fct_margin_chain": "province_id in {p} and commodity_id in {c}",
+    "fct_pipeline_runs": None,
+    "fct_test_results": None,
 }
 
 
@@ -41,19 +47,19 @@ def main() -> None:
     out.unlink(missing_ok=True)
 
     con = duckdb.connect(str(out))
-    con.execute(f"attach '{src.as_posix()}' as full (read_only)")
+    con.execute(f"attach '{src.as_posix()}' as src_db (read_only)")
     p = "(" + ", ".join(str(x) for x in PROVINCES) + ")"
     c = "(" + ", ".join(f"'{x}'" for x in COMMODITIES) + ")"
     for table, where in TABLES.items():
         clause = f" where {where.format(p=p, c=c)}" if where else ""
-        con.execute(f"create table main.{table} as select * from full.main.{table}{clause}")
+        con.execute(f"create table main.{table} as select * from src_db.main.{table}{clause}")
         n = con.execute(f"select count(*) from main.{table}").fetchone()[0]
         log.info("%-20s %8s rows", table, n)
 
     span = con.execute("select max(date) - min(date) from fct_daily_price").fetchone()[0]
     if span is None or span < MIN_DAYS:
         raise SystemExit(f"sample covers {span} days; need >= {MIN_DAYS}. Backfill more first.")
-    con.execute("detach full")
+    con.execute("detach src_db")
     con.close()
     log.info("wrote %s (%s days of history)", out, span)
 

@@ -19,6 +19,8 @@ vars:
   daily_jump_threshold: 0.60
   coverage_min_share: 0.80
   tier_order_max_violation_share: 0.05
+  row_count_tolerance: 0.30
+  source_gap_max: 0.15
   # BPS CPI expenditure groups kept: 1551 food, beverages & tobacco; 1552 food
   bps_groups: [1551, 1552]
 

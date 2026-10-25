@@ -30,8 +30,9 @@ FIXTURE = {
 }
 
 
-def write_bronze(bronze: Path) -> None:
-    for source, (sample, name, params) in FIXTURE.items():
+def write_bronze(bronze: Path, sources=tuple(FIXTURE)) -> None:
+    for source in sources:
+        sample, name, params = FIXTURE[source]
         day = bronze / source / "2026-10-25"
         day.mkdir(parents=True)
         shutil.copy(SAMPLES / sample, day / name)
@@ -43,12 +44,7 @@ def write_bronze(bronze: Path) -> None:
         (bronze / source / "_manifest.jsonl").write_text(json.dumps(row) + "\n")
 
 
-@pytest.fixture(scope="module")
-def db(tmp_path_factory) -> duckdb.DuckDBPyConnection:
-    if not DBT.exists():
-        pytest.skip("dbt not installed in this environment")
-    tmp = tmp_path_factory.mktemp("dbt")
-    write_bronze(tmp / "bronze")
+def dbt_build(tmp: Path) -> tuple[subprocess.CompletedProcess, Path]:
     db_path = tmp / "test.duckdb"
     env = {
         **os.environ, "PANGANWATCH_DB": str(db_path),
@@ -59,9 +55,32 @@ def db(tmp_path_factory) -> duckdb.DuckDBPyConnection:
         [str(DBT), "build", "--profiles-dir", ".", "--target-path", str(tmp / "target")],
         cwd=ROOT / "dbt", env=env, capture_output=True, text=True, encoding="utf-8",
     )
+    return result, db_path
+
+
+@pytest.fixture(scope="module")
+def db(tmp_path_factory) -> duckdb.DuckDBPyConnection:
+    if not DBT.exists():
+        pytest.skip("dbt not installed in this environment")
+    tmp = tmp_path_factory.mktemp("dbt")
+    write_bronze(tmp / "bronze")
+    result, db_path = dbt_build(tmp)
     assert result.returncode == 0, result.stdout[-4000:]
     con = duckdb.connect(str(db_path), read_only=True)
     yield con
+    con.close()
+
+
+def test_builds_when_only_pihps_was_fetched(tmp_path):
+    # A fresh checkout with no BPS key: missing sources must give empty tables, not errors.
+    if not DBT.exists():
+        pytest.skip("dbt not installed in this environment")
+    write_bronze(tmp_path / "bronze", sources=("pihps",))
+    result, db_path = dbt_build(tmp_path)
+    assert result.returncode == 0, result.stdout[-4000:]
+    con = duckdb.connect(str(db_path), read_only=True)
+    assert con.execute("select count(*) from stg_cpi").fetchone() == (0,)
+    assert con.execute("select count(*) from fct_daily_price").fetchone()[0] > 0
     con.close()
 
 

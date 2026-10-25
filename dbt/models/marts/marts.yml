@@ -47,6 +47,8 @@ models:
           arguments: {columns: [date, commodity_id, province_id, market_tier]}
       - province_coverage:
           config: {severity: warn}
+      - row_count_stable:
+          config: {severity: warn}
     columns:
       - name: date
         data_tests:
@@ -58,6 +60,11 @@ models:
         data_tests: [not_null]
       - name: is_imputed
         data_tests: [not_null]
+      - name: source_gap_pct
+        description: PIHPS vs Bapanas gap (decimal). NULL until the optional Bapanas source exists.
+        data_tests:
+          - source_gap_within:
+              config: {severity: warn}
 
   - name: fct_price_change
     description: >

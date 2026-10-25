@@ -56,6 +56,36 @@ having count(distinct f.province_id) < {{ var('coverage_min_share') }} * n_prov.
 {% endtest %}
 
 
+{% test row_count_stable(model, date_column='date') %}
+-- Latest date's row count within +/- row_count_tolerance of the average over the previous
+-- 28 calendar days (published days only, since PIHPS skips weekends).
+with daily as (
+    select {{ date_column }} as d, count(*) as n from {{ model }} group by 1
+),
+latest as (select max(d) as d from daily),
+baseline as (
+    select avg(n) as avg_n
+    from daily, latest
+    where daily.d < latest.d and daily.d >= latest.d - 28
+)
+select daily.d, daily.n, baseline.avg_n
+from daily
+join latest on daily.d = latest.d
+cross join baseline
+where baseline.avg_n is not null
+  and abs(daily.n / baseline.avg_n - 1) > {{ var('row_count_tolerance') }}
+{% endtest %}
+
+
+{% test source_gap_within(model, column_name) %}
+-- PIHPS vs Bapanas gap above the threshold (spec §8). Passes trivially while Bapanas
+-- (optional source S2) is not ingested and the column is NULL.
+select *
+from {{ model }}
+where abs({{ column_name }}) > {{ var('source_gap_max') }}
+{% endtest %}
+
+
 {% test tier_order(model) %}
 -- producer <= wholesale <= retail on most days: flag commodity-months where more than
 -- tier_order_max_violation_share of matched rows break the order (real data is noisy).

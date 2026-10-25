@@ -61,6 +61,7 @@ Cities per tier (2026-10-25): traditional 110, modern 78, wholesale 75, producer
 ### Data quality seen in the first loads
 
 - Single-city typos exist and are caught as warnings: e.g. premium rice in one city 11,900 → 34,400 → 11,900 on consecutive days; beef at Rp 455,000/kg. The province median absorbs them.
+- **2022 cooking-oil crisis shows up as out-of-bounds prices:** branded oil (`minyak_goreng_kemasan_1`) in Kota Kendari and Kota Bau-Bau (Sulawesi Tenggara) went from ~Rp 22,000 to Rp 55,000–57,000 in Mar 2022 and eased back to ~Rp 24,000 by Oct 2022 (Kota Parepare: one day at 88,250). The gradual path looks real, but some reports may be 2-liter pack prices. Kept as reported (warn only); not a v1 commodity. Analyses of branded oil in 2022 should check these cities.
 
 ## S3 — BPS WebAPI (CPI)
 
