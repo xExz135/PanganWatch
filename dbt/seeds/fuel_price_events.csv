@@ -1,0 +1,5 @@
+effective_date,fuel,old_price_idr_per_liter,new_price_idr_per_liter,is_subsidized,verified,source
+2022-04-01,pertamax,9000,12500,false,false,Pertamina announcement (Pertamax RON 92 Jawa-Bali price)
+2022-09-03,pertalite,7650,10000,true,false,Government announcement 3 Sep 2022 (subsidised fuel adjustment)
+2022-09-03,solar,5150,6800,true,false,Government announcement 3 Sep 2022 (subsidised fuel adjustment)
+2022-09-03,pertamax,12500,14500,false,false,Government announcement 3 Sep 2022

@@ -6,6 +6,7 @@ http:
   timeout_seconds: 180          # a 1-year city request takes ~40 s
   sleep_seconds: 2              # politeness pause between requests
   retry_backoff_seconds: [2, 8, 30]   # 3 attempts, on timeouts and 5xx only
+  rate_limit_default_wait_seconds: 60 # on HTTP 429 without a Retry-After hint
 
 pihps:
   base_url: "https://www.bi.go.id/hargapangan/WebSite/TabelHarga"
@@ -30,3 +31,38 @@ pihps:
   daily:
     rolling_window_days: 7      # PIHPS may revise recent values
     max_failed_share: 0.05      # run exits non-zero above this share of failed requests
+
+bps:
+  # Official WebAPI; key from env BPS_API_KEY (never logged). docs/source_notes.md (S3).
+  base_url: "https://webapi.bps.go.id/v1/api/list/model/data/lang/eng/domain/0000"
+  year_offset: 1900             # the API's `th` parameter = year - 1900 (125 = 2025)
+  sleep_seconds: 4              # BPS rate-limits at ~20 requests/minute (HTTP 429)
+  refetch_recent_years: 1       # current + this many past years are re-fetched daily
+  # Each table: what it measures and which years to pull. The CPI base changed in 2024,
+  # and BPS publishes each base under different table ids.
+  tables:
+    - {var_id: 1905, measure: index, base_year: 2018, level: city, years: [2021, 2023]}
+    - {var_id: 1890, measure: mom,   base_year: 2018, level: city, years: [2021, 2023]}
+    - {var_id: 2212, measure: index, base_year: 2022, level: city, years: [2024, null]}
+    - {var_id: 2223, measure: mom,   base_year: 2022, level: city, years: [2024, null]}
+    - {var_id: 2250, measure: yoy,   base_year: 2022, level: city, years: [2024, null]}
+    - {var_id: 2305, measure: index, base_year: 2022, level: province, years: [2024, null]}
+    - {var_id: 2293, measure: mom,   base_year: 2022, level: province, years: [2024, null]}
+  # Whole tables are kept in bronze; the expenditure groups used are chosen in dbt
+  # (var `bps_groups` in dbt_project.yml).
+
+weather:
+  # Open-Meteo historical archive (ERA5-based). Free for non-commercial use, CC BY 4.0.
+  base_url: "https://archive-api.open-meteo.com/v1/archive"
+  daily_variables: [precipitation_sum, temperature_2m_mean, temperature_2m_max]
+  timezone: "Asia/Jakarta"
+  history_start: "2015-01-01"   # 10+ years so anomalies can be measured vs a normal
+  daily_window_days: 14         # the last days are preliminary and get revised
+
+fx:
+  # ECB euro reference rates, cross-rated to USD/IDR by the Frankfurter API. No key.
+  base_url: "https://api.frankfurter.dev/v1"
+  base: USD
+  quote: IDR
+  history_start: "2021-01-01"
+  daily_window_days: 10

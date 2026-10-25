@@ -1,9 +1,12 @@
--- is_cpi_city is NULL until the BPS CPI source is ingested (Week 3).
+-- is_cpi_city: the city is one of BPS's 150 CPI cities (2022=100 base), matched by name.
 select
     c.city_id,
     c.city_name as name,
     p.province_id,
-    cast(null as boolean) as is_cpi_city,
+    c.city_id in (
+        select city_id from {{ ref('stg_cpi') }}
+        where region_level = 'city' and base_year = 2022 and city_id is not null
+    ) as is_cpi_city,
     c.has_traditional,
     c.has_modern,
     c.has_wholesale,

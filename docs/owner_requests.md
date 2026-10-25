@@ -12,6 +12,12 @@ Questions about spec, scope, contract or dependencies. Each role edits only its 
 6. **Spec — `stg_weather_forecast` (S5) cannot be trained on.** BMKG keeps no forecast history, so any model feature built from it exists only in production (train/serve skew). Suggest dropping S5 from model features, or archiving forecasts from now and using them only after ~1 year.
 7. **Spec — forecast gate baseline.** MASE vs seasonal-naive is an easy bar for 7–14-day food prices; the plain naive forecast is usually harder to beat. Suggest Gate 3 also require beating naive.
 8. **Spec — publishing the DuckDB file by daily git commit** will bloat the repo (each commit keeps a full binary copy; GitHub blocks files > 100 MB). Suggest MotherDuck free tier or a GitHub Release asset. Decision needed before Week 4.
+9. **Decision — where the daily job runs (blocks `daily.yml`).** geo-probe passed (2026-10-25), so all three options are open. Depends on #8, because a GitHub-hosted runner starts empty every day: bronze history (~400 MB) and the database must be restored before each run and saved after. Options:
+   - **(a) Laptop / self-hosted runner** (spec fallback): data stays on disk, nothing to restore. Needs the laptop on at 14:00 WIB. Simplest; also the only option if geo-probe fails.
+   - **(b) GitHub-hosted + Release assets:** restore DB + bronze archive from a Release each run, upload after. Free, ~1–2 min extra per run.
+   - **(c) GitHub-hosted + MotherDuck:** DB lives in MotherDuck; bronze archived to Releases. Cleanest for the dashboard; one more account.
+   `python -m ingestion.daily_pipeline` already works the same in all three.
+10. **Owner action — verify the fuel seed.** `dbt/seeds/fuel_price_events.csv` has the 2022 changes only, from memory (`verified=false`). Add any later Pertalite/Solar changes.
 
 ## Data Analyst
 

@@ -55,9 +55,48 @@ Cities per tier (2026-10-25): traditional 110, modern 78, wholesale 75, producer
 
 ### Access
 
-- Reachable from Indonesia without blocks. **Geo-block test from GitHub Actions (US) still to do** (Week 1 task).
+- Reachable from Indonesia without blocks, and **from GitHub Actions (US runners): geo-probe passed on 2026-10-25** (HTTP 200, ~8 s).
 - Politeness: 2 s between requests, User-Agent with contact email, 3 retries (2/8/30 s) on timeouts and 5xx.
 
-## S2–S10
+### Data quality seen in the first loads
 
-Not started. BPS (S3) needs an API key from webapi.bps.go.id (owner action).
+- Single-city typos exist and are caught as warnings: e.g. premium rice in one city 11,900 → 34,400 → 11,900 on consecutive days; beef at Rp 455,000/kg. The province median absorbs them.
+
+## S3 — BPS WebAPI (CPI)
+
+- **Endpoint:** `https://webapi.bps.go.id/v1/api/list/model/data/lang/eng/domain/0000/var/<var_id>/th/<year-1900>/key/<KEY>/`. The key is in the URL path, so httpx's URL logging is switched off and errors are redacted.
+- **`th` is required** (year − 1900, e.g. 125 = 2025). One request = one table × one year.
+- **Rate limit ≈ 20 requests/minute** → HTTP 429 with `{"retry_after": 60}`. We sleep 4 s and honour `retry_after`.
+- **Values are packed under one key**: `region || table || group || year || month`, e.g. `1` `2212` `1551` `125` `1` → `"1221215511251"`. Month 13 = annual. `stg_cpi` splits at `table||group` and validates the region against the table's own list.
+- **The CPI base changed in 2024**, and each base has different table ids:
+
+  | Base | Index | m-o-m | y-o-y | Regions |
+  |---|---|---|---|---|
+  | 2018=100 (≤ 2023) | 1905 | 1890 | — (derived from index) | 90 cities, region = BPS code (e.g. 1171) |
+  | 2022=100 (≥ 2024) | 2212 | 2223 | 2250 | 150 cities, region = row number 1–151 (no code) |
+  | 2022=100, provinces | 2305 | 2293 | — | 38 provinces, region = BPS code (1100 …) |
+
+  `INDONESIA` (9999 or 151) is the national row. Index values are only comparable within one base; m-o-m and y-o-y are comparable across.
+- **Groups kept:** 1551 food, beverages & tobacco; 1552 food.
+- **City mapping:** 95 of 150 BPS cities match a PIHPS city by name. 2022-base cities have no code, so their province comes from that match (NULL if unmatched).
+- **38 vs 34 provinces:** BPS has the 2022 Papua split; PIHPS doesn't. The four new provinces get `province_id` NULL.
+
+## S4 — Weather history (Open-Meteo archive)
+
+- `https://archive-api.open-meteo.com/v1/archive`, no key, free for non-commercial use, **CC BY 4.0: credit "Weather data by Open-Meteo.com"**.
+- One point per province (capital coordinates in `provinces.csv`). Variables: `precipitation_sum`, `temperature_2m_mean`, `temperature_2m_max`, timezone Asia/Jakarta.
+- Full 2015→yesterday history in one request per province (~6 s). Daily run re-fetches the last 14 days (recent days are preliminary).
+- Seen once: the server cut a long response mid-stream ("Unexpected error while streaming data: timeoutReached"), returned with HTTP 200. The shape check marked it failed; a re-run fixed it.
+
+## S7 — USD/IDR (Frankfurter / ECB)
+
+- `https://api.frankfurter.dev/v1/<start>..<end>?from=USD&to=IDR`, no key. ECB euro reference rates cross-rated to USD/IDR; published on TARGET working days only. `stg_fx` forward-fills gaps with `is_filled = true`.
+- Chosen over JISDOR (form download, no API) and yfinance (unofficial, extra dependency).
+
+## S8 — Fuel price events
+
+- Hand-built seed `dbt/seeds/fuel_price_events.csv`, one row per price change with a source. Unverified; covers 2022 changes only.
+
+## S2, S5, S9, S10
+
+Not started. S5 (BMKG forecast) is on hold: see owner_requests.md item 6.

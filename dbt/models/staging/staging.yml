@@ -15,6 +15,75 @@ models:
           - accepted_values:
               arguments: {values: [ok, empty, failed]}
 
+  - name: bronze_bps_raw
+    description: Bronze BPS WebAPI responses (one per table x year fetch), as received.
+    columns:
+      - name: request_key
+        data_tests: [not_null]
+
+  - name: stg_cpi
+    description: >
+      Monthly CPI from BPS, one row per month x region x group x CPI base year.
+      region_level = national | province | city. The CPI base changed in 2024 (2018=100 ->
+      2022=100); index_value is only comparable within one base_year, while mom_pct and
+      yoy_pct (decimals) are comparable across bases. city_id = PIHPS city when the BPS
+      city name matches one (else NULL). province_id is NULL for national rows and for
+      the 2022 Papua split provinces, which PIHPS does not have.
+      group_code 1551 = food, beverages & tobacco; 1552 = food.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [month, base_year, region_level, bps_region_code, group_code]}
+    columns:
+      - name: month
+        data_tests: [not_null]
+      - name: group_code
+        data_tests:
+          - accepted_values:
+              arguments: {values: [1551, 1552]}
+      - name: region_level
+        data_tests:
+          - accepted_values:
+              arguments: {values: [national, province, city]}
+      - name: city_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('pihps_cities'), field: city_id}
+      - name: province_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('provinces'), field: province_id}
+
+  - name: bronze_weather_raw
+    description: Bronze Open-Meteo responses (one per province x date range), as received.
+  - name: bronze_fx_raw
+    description: Bronze Frankfurter (ECB) USD/IDR responses, as received.
+
+  - name: stg_weather
+    description: >
+      Daily weather per province at its capital (Open-Meteo archive, ERA5-based).
+      Latest fetch wins; the last ~5 days are preliminary. Source: Open-Meteo.com (CC BY 4.0).
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, province_id]}
+    columns:
+      - name: date
+        data_tests: [not_null]
+      - name: province_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('provinces'), field: province_id}
+
+  - name: stg_fx
+    description: >
+      USD/IDR per calendar day (ECB reference rate via Frankfurter). Days without a
+      published rate carry the last one forward with is_filled = true.
+    columns:
+      - name: date
+        data_tests: [unique, not_null]
+      - name: usd_idr
+        data_tests: [not_null]
+
   - name: stg_pihps_price
     description: >
       Silver PIHPS prices, one row per date x commodity x city x market tier. Latest fetch

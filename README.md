@@ -31,4 +31,7 @@ pytest
 ### Data sources and credits
 
 - **PIHPS Nasional — Bank Indonesia**, https://www.bi.go.id/hargapangan. Data © Bank Indonesia; used for non-commercial research with attribution. Raw dumps are not redistributed.
+- **Badan Pusat Statistik (BPS)**, consumer price indices via the BPS WebAPI, https://webapi.bps.go.id.
+- **Weather data by [Open-Meteo.com](https://open-meteo.com/)** (CC BY 4.0), historical archive based on ERA5.
+- **USD/IDR**: European Central Bank reference rates via the [Frankfurter](https://frankfurter.dev) API.
 <!-- /owner: data-engineer -->
