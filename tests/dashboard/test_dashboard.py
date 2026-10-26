@@ -353,11 +353,93 @@ def test_forecasts_show_the_live_model_only(gold, monkeypatch):
     at = run_page(gold, monkeypatch, "views/forecasts.py")
     assert at.title[0].value == "Forecasts"
     spec = at.get("plotly_chart")[0].proto.spec
-    assert "likely Rp 75,000 per kg on" in spec
-    assert "Rp 60,000 to Rp 118,000" in spec
+    # a no-change forecast leads with today's price and the range, not a repeated "likely"
+    assert "now Rp 75,000 per kg, with an 80% chance of Rp 60,000 to Rp 118,000" in spec
     import json
     plotted = {v for t in json.loads(spec)["data"] for v in (t.get("y") or [])
                if isinstance(v, (int, float))}
     assert 75000 in plotted and not plotted & {11111, 22222, 33333}  # shadow stays hidden
     table = at.dataframe[0].value
-    assert table["In 4 weeks: likely"].tolist() == ["Rp 75,000"]
+    assert table["Price now"].tolist() == ["Rp 75,000"]
+    assert "In 4 weeks: likely" not in table.columns  # would only repeat "Price now"
+    assert table["In 4 weeks: 80% range"].tolist() == ["Rp 60,000 to Rp 118,000 (-20.0% / +57.3%)"]
+
+
+def test_forecasts_show_likely_prices_when_the_model_expects_a_change(gold, monkeypatch):
+    add_forecasts(gold)
+    monkeypatch.setattr(common, "live_model", lambda: "lgbm_routed")
+    at = run_page(gold, monkeypatch, "views/forecasts.py")
+    assert "likely Rp 22,222 per kg on" in at.get("plotly_chart")[0].proto.spec
+    table = at.dataframe[0].value
+    assert table["In 4 weeks: likely"].tolist() == ["Rp 22,222"]
+
+
+# --- accuracy -----------------------------------------------------------------------------
+
+def add_ledger(path: Path) -> None:
+    """Two weeks of graded 7-day forecasts in Jakarta: naive misses by 10%, the shadow by 5%;
+    naive's range always holds the price, the shadow's half the time. Plus backtest rows."""
+    con = duckdb.connect(str(path))
+    con.execute("""create table fct_forecast (run_date date, target_date date,
+                   horizon_days integer, commodity_id varchar, province_id integer,
+                   model_version varchar, q10 bigint, q50 bigint, q90 bigint,
+                   created_at timestamp)""")
+    con.execute("""create table fct_forecast_ledger (run_date date, target_date date,
+                   horizon_days integer, commodity_id varchar, province_id integer,
+                   model_version varchar, actual_price bigint, abs_error bigint,
+                   pct_error double, in_interval_80 boolean, scored_at timestamp)""")
+    f, led = [], []
+    for i in range(14):
+        target = LATEST - timedelta(days=i)
+        run = target - timedelta(days=7)
+        for version, q50, inside in [("naive-abc1234", 110, True),
+                                     ("lgbm_routed-20261027-abc1234", 105, i % 2 == 0)]:
+            lo, hi = (q50 - 20, q50 + 20) if inside else (q50 + 1, q50 + 20)
+            f.append((run, target, 7, "cabai_rawit_merah", 31, version, lo * 500, q50 * 500,
+                      hi * 500))
+            led.append((run, target, 7, "cabai_rawit_merah", 31, version, 50000,
+                        abs(q50 * 500 - 50000), abs(q50 * 500 - 50000) / 50000, inside))
+    con.executemany("insert into fct_forecast values (?, ?, ?, ?, ?, ?, ?, ?, ?, now())", f)
+    con.executemany("insert into fct_forecast_ledger values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())",
+                    led)
+    con.execute("""create table fct_model_metrics as select * from (values
+        ('backtest-1', 'naive', 'forecast', 7, 'all', null, 'smape', 0.027, now()),
+        ('backtest-1', 'naive', 'forecast', 7, 'all', null, 'coverage_80', 0.84, now()),
+        ('backtest-2', 'lgbm_routed', 'forecast', 7, 'all', null, 'smape', 0.025, now()),
+        ('backtest-2', 'lgbm_routed', 'forecast', 7, 'all', null, 'relmae_naive', 0.984, now()),
+        ('backtest-2', 'lgbm_routed', 'forecast', 7, 'all', null,
+         'share_series_beating_naive', 0.40, now()),
+        ('backtest-2', 'lgbm_routed', 'forecast', 7, 'all', 'cabai_rawit_merah',
+         'relmae_naive', 0.92, now()),
+        ('backtest-2', 'lgbm_routed', 'forecast', 7, 'all', 'minyak_goreng_curah',
+         'relmae_naive', 1.01, now())
+        ) t(model_version, model_name, task, horizon_days, segment, commodity_id, metric,
+            value, evaluated_at)""")
+    con.close()
+
+
+def test_accuracy_waits_for_graded_forecasts(gold, monkeypatch):
+    at = run_page(gold, monkeypatch, "views/accuracy.py")
+    assert at.title[0].value == "Forecast accuracy"
+    assert any("No 1 week forecasts graded yet" in i.value for i in at.info)
+    assert any("Backtest results appear" in i.value for i in at.info)
+
+
+def test_accuracy_live_record_and_backtest(gold, monkeypatch):
+    add_ledger(gold)
+    monkeypatch.setattr(common, "live_model", lambda: "naive")
+    at = run_page(gold, monkeypatch, "views/accuracy.py")
+    values = {m.label: [] for m in at.metric}
+    for m in at.metric:
+        values[m.label].append(m.value)
+    # naive off by 10% of 50,000 -> sMAPE 2*5000/105000 = 9.5%; shadow 5% -> 4.9%
+    assert values["Typical error"] == ["9.5%", "4.9%"]
+    assert values["Range caught the real price"] == ["100%", "50%"]
+    assert values["Error vs baseline"] == ["50.0% lower"]
+    specs = [c.proto.spec for c in at.get("plotly_chart")]
+    assert any("were off by 9.5% on average" in s for s in specs)  # live model by default
+    assert any("lower error than the baseline on 1 of 2 foods" in s for s in specs)
+    table = at.dataframe[0].value
+    assert table["Model"].tolist() == ["Baseline: no change (live)", "LightGBM where it helped"]
+    assert table["Error vs baseline"].tolist() == ["–", "1.6% lower"]
+    assert table["Live typical error"].tolist() == ["9.5%", "4.9%"]

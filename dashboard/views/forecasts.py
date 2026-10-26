@@ -33,10 +33,11 @@ from common import (
 DEFAULT_PROVINCE = 31  # DKI Jakarta, the persona's province
 HISTORY_DAYS = 90
 MODEL_NOTE = {
-    "naive": ("The current forecast is a simple baseline: the likely price is the last "
-              "published price, and the range shows how far prices moved over the same number "
-              "of days in the past. A machine-learning model runs alongside it and will "
-              "replace it only if it proves more accurate on real, later prices."),
+    "naive": ("The current forecast is a simple baseline that assumes the price stays where "
+              "it is, so the dashed line is flat. The shaded range shows how far the price "
+              "could move, based on how much it moved over the same number of days in the "
+              "past. A machine-learning model runs alongside it and will replace it only if "
+              "it proves more accurate on real, later prices."),
 }
 
 page_header("Forecasts", "Where is this price heading in the next 4 weeks?")
@@ -95,9 +96,15 @@ else:
     before = hist[hist["date"] < pd.Timestamp(run_date)]
     last = before.iloc[-1] if not before.empty else None
     far = fc.iloc[-1]
-    title = (f"{short[commodity]} in {place}: likely {rupiah(far['q50'])} {unit} on "
-             f"{far['target_date']:%d %b}, with an 80% chance of "
-             f"{rupiah(far['q10'])} to {rupiah(far['q90'])}")
+    flat = last is not None and bool((fc["q50"] == last["price_idr"]).all())
+    if flat:  # a no-change forecast: the range is the news, not the likely price
+        title = (f"{short[commodity]} in {place}: now {rupiah(last['price_idr'])} {unit}, "
+                 f"with an 80% chance of {rupiah(far['q10'])} to {rupiah(far['q90'])} "
+                 f"by {far['target_date']:%d %b}")
+    else:
+        title = (f"{short[commodity]} in {place}: likely {rupiah(far['q50'])} {unit} on "
+                 f"{far['target_date']:%d %b}, with an 80% chance of "
+                 f"{rupiah(far['q10'])} to {rupiah(far['q90'])}")
 
     # the range fans out from the last published price
     x = ([last["date"]] if last is not None else []) + list(fc["target_date"])
@@ -152,6 +159,13 @@ table = query("""
     where run_date = ? and model_version like ? and province_id = ?
       and horizon_days in (7, 28)
 """, (run_date, pattern, province))
+now = query("""
+    select commodity_id, arg_max(price_idr, date) as price_now
+    from fct_daily_price
+    where province_id = ? and market_tier = 'traditional' and date < ?
+      and date >= ?::date - 14
+    group by commodity_id
+""", (province, run_date, run_date)).set_index("commodity_id")["price_now"]
 if table.empty:
     st.info(f"No forecasts for {place}.")
 else:
@@ -159,23 +173,31 @@ else:
                              values=["q10", "q50", "q90"], aggfunc="first")
     order = [c for c in V1_COMMODITIES if c in wide.index] + sorted(
         c for c in wide.index if c not in V1_COMMODITIES)
+    # a "likely" column only when the model expects a change; else it repeats "Price now"
+    moving = any(wide.loc[c, ("q50", h)] != now.get(c) for c in order for h in (7, 28)
+                 if ("q50", h) in wide.columns and pd.notna(wide.loc[c, ("q50", h)]))
     rows = []
     for c in order:
         r = wide.loc[c]
-        row = {"Food": names.get(c, c), "Unit": per_unit(c)}
+        base = now.get(c)
+        row = {"Food": names.get(c, c), "Unit": per_unit(c), "Price now": rupiah(base)}
         for h, label in [(7, "In 1 week"), (28, "In 4 weeks")]:
+            ref = base if base is not None and pd.notna(base) else r.get(("q50", h))
             if pd.isna(r.get(("q50", h))):
-                row[f"{label}: likely"] = row[f"{label}: 80% range"] = "–"
+                if moving:
+                    row[f"{label}: likely"] = "–"
+                row[f"{label}: 80% range"] = "–"
                 continue
-            row[f"{label}: likely"] = rupiah(r[("q50", h)])
+            if moving:
+                row[f"{label}: likely"] = rupiah(r[("q50", h)])
             row[f"{label}: 80% range"] = (
                 f"{rupiah(r[('q10', h)])} to {rupiah(r[('q90', h)])} "
-                f"({pct(r[('q10', h)] / r[('q50', h)] - 1)} / "
-                f"{pct(r[('q90', h)] / r[('q50', h)] - 1)})")
+                f"({pct(r[('q10', h)] / ref - 1)} / {pct(r[('q90', h)] / ref - 1)})")
         rows.append(row)
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-    st.caption("A wide range means the price has swung a lot in the past; a narrow one means "
-               "it rarely moves. Percentages are relative to the likely price.")
+    st.caption("80% range: the price should land inside it 4 times out of 5. A wide range means "
+               "the price has swung a lot in the past; a narrow one means it rarely moves. "
+               "Percentages are relative to the price now.")
     st.download_button(
         "Download CSV", table.assign(province=place).to_csv(index=False).encode("utf-8"),
         file_name=f"panganwatch_forecast_{run_date:%Y%m%d}_{province}.csv", mime="text/csv",

@@ -6,7 +6,8 @@ Uses only prices dated before --date, the same rule as the backtest. Append-only
 idempotent per model: if --date already has a model's forecasts, nothing is written, so a
 re-run never changes a published forecast. Publishes `live.model` (what users see), then each
 `live.shadow` model; a shadow model that fails or has no trained file (ml.train) is skipped
-with a warning, never failing the daily job.
+with a warning, never failing the daily job. Finally loads the committed backtest results
+into fct_model_metrics (ml.model_metrics).
 """
 
 from __future__ import annotations
@@ -144,6 +145,11 @@ def main(argv: list[str] | None = None) -> int:
                               name, args.date)
                 if os.environ.get("GITHUB_ACTIONS"):  # shows on the run's summary page
                     print(f"::warning::shadow model {name} failed for {args.date}")
+        try:  # committed backtest results -> fct_model_metrics (accuracy page)
+            from ml.model_metrics import publish as publish_metrics
+            log.info("fct_model_metrics: %s backtest rows", publish_metrics(con))
+        except Exception:
+            log.exception("loading backtest metrics failed; forecasts unaffected")
     finally:
         con.close()
     return 0
