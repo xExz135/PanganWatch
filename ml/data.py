@@ -30,8 +30,11 @@ def load_calendar(con) -> pd.DataFrame:
     return df
 
 
-def load_features(con) -> pd.DataFrame:
-    """fct_features (DS, dbt/models/ml/): one row per published day x series."""
-    df = con.execute("select * from fct_features order by date, commodity_id, province_id").df()
+def load_features(con, since=None) -> pd.DataFrame:
+    """fct_features (DS, dbt/models/ml/): one row per published day x series, optionally only
+    rows dated on or after `since` (the daily forecast needs just the latest rows)."""
+    where, args = ("where date >= ?", [since]) if since is not None else ("", [])
+    df = con.execute(f"select * from fct_features {where} "
+                     "order by date, commodity_id, province_id", args).df()
     df["date"] = pd.to_datetime(df["date"])
     return df

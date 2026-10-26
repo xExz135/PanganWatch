@@ -37,6 +37,10 @@ class RoutedForecaster:
         return replace(self, model=model, baseline=baseline,
                        use_model=choose(model.validation, self.min_gain))
 
+    def with_baseline(self, history: pd.DataFrame, horizons: list[int]) -> RoutedForecaster:
+        """Refit only the cheap baseline (daily), keeping the weekly-trained model."""
+        return replace(self, baseline=self.baseline.fit(history, horizons=horizons))
+
     def predict(self, history: pd.DataFrame, run_date: date, horizons: list[int]) -> pd.DataFrame:
         base = self.baseline.predict(history, run_date, horizons)
         if not self.use_model or base.empty:

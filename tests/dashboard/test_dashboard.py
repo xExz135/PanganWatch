@@ -313,3 +313,51 @@ def test_insights_spillover_tab(gold, monkeypatch):
     specs = [c.proto.spec for c in at.get("plotly_chart")]
     assert any("how closely each province moves with the producing centres" in s
                for s in specs)  # no province beyond 1,500 km in this toy, so no near/far line
+
+
+# --- forecasts ----------------------------------------------------------------------------
+
+def add_forecasts(path: Path) -> None:
+    """Live naive forecasts plus a shadow model's (different numbers) for the same day."""
+    con = duckdb.connect(str(path))
+    con.execute("""create table fct_forecast (run_date date, target_date date,
+                   horizon_days integer, commodity_id varchar, province_id integer,
+                   model_version varchar, q10 bigint, q50 bigint, q90 bigint,
+                   created_at timestamp)""")
+    run = LATEST + timedelta(days=1)
+    rows = []
+    for h in (1, 7, 14, 28):
+        for prov in (31, 35):
+            rows.append((run, run + timedelta(days=h), h, "cabai_rawit_merah", prov,
+                         "naive-abc1234", 60000, 75000, 90000 + 1000 * h))
+            rows.append((run, run + timedelta(days=h), h, "cabai_rawit_merah", prov,
+                         "lgbm_routed-20261027-abc1234", 11111, 22222, 33333))
+    con.executemany("insert into fct_forecast values (?, ?, ?, ?, ?, ?, ?, ?, ?, now())", rows)
+    con.close()
+
+
+def test_live_model_matches_settings():
+    import yaml
+    cfg = yaml.safe_load((ROOT / "ml" / "settings.yaml").read_text(encoding="utf-8"))
+    assert common.live_model() == cfg["live"]["model"]
+
+
+def test_forecasts_wait_for_the_first_run(gold, monkeypatch):
+    at = run_page(gold, monkeypatch, "views/forecasts.py")
+    assert any("No forecasts published yet" in i.value for i in at.info)
+
+
+def test_forecasts_show_the_live_model_only(gold, monkeypatch):
+    add_forecasts(gold)
+    monkeypatch.setattr(common, "live_model", lambda: "naive")
+    at = run_page(gold, monkeypatch, "views/forecasts.py")
+    assert at.title[0].value == "Forecasts"
+    spec = at.get("plotly_chart")[0].proto.spec
+    assert "likely Rp 75,000 per kg on" in spec
+    assert "Rp 60,000 to Rp 118,000" in spec
+    import json
+    plotted = {v for t in json.loads(spec)["data"] for v in (t.get("y") or [])
+               if isinstance(v, (int, float))}
+    assert 75000 in plotted and not plotted & {11111, 22222, 33333}  # shadow stays hidden
+    table = at.dataframe[0].value
+    assert table["In 4 weeks: likely"].tolist() == ["Rp 75,000"]

@@ -11,6 +11,7 @@ st.set_page_config(page_title="PanganWatch", page_icon="🌶️", layout="wide")
 pages = [
     st.Page("views/today.py", title="Today", default=True),
     st.Page("views/explore.py", title="Explore prices", url_path="explore"),
+    st.Page("views/forecasts.py", title="Forecasts", url_path="forecasts"),
     st.Page("views/insights.py", title="Insights", url_path="insights"),
     st.Page("views/data_quality.py", title="Data quality & about",
             url_path="data-quality"),

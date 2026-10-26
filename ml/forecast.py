@@ -3,22 +3,26 @@
     python -m ml.forecast [--date YYYY-MM-DD] [--db PATH]
 
 Uses only prices dated before --date, the same rule as the backtest. Append-only and
-idempotent: if --date already has forecasts, nothing is written, so a re-run never changes
-a published forecast. The model is `live.model` in ml/settings.yaml.
+idempotent per model: if --date already has a model's forecasts, nothing is written, so a
+re-run never changes a published forecast. Publishes `live.model` (what users see), then each
+`live.shadow` model; a shadow model that fails or has no trained file (ml.train) is skipped
+with a warning, never failing the daily job.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
-from datetime import date
+from datetime import date, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from ml.baselines import NaiveForecaster, SeasonalNaiveForecaster
-from ml.data import load_history
+from ml.data import load_calendar, load_features, load_history
 from ml.settings import settings
 from ml.store import default_db, ensure_tables, model_version, today_wib, utc_now
 
@@ -30,15 +34,17 @@ COLUMNS = ["run_date", "target_date", "horizon_days", "commodity_id", "province_
 
 
 def make_forecast(history: pd.DataFrame, run_date: date, model_name: str,
-                  horizons: list[int] | None = None) -> pd.DataFrame:
-    """Forecast every live series from rows dated before run_date. Prices in whole rupiah."""
+                  horizons: list[int] | None = None, trained=None) -> pd.DataFrame:
+    """Forecast every live series from rows dated before run_date. Prices in whole rupiah.
+    `trained` is a model loaded by ml.train (its baseline part is refit here)."""
     horizons = horizons or list(settings()["backtest"]["horizons"])
-    if model_name not in MODELS:
+    if model_name not in MODELS and trained is None:
         raise ValueError(f"unknown live model {model_name!r}; known: {sorted(MODELS)}")
     hist = history[history["date"] < pd.Timestamp(run_date)]
     if hist.empty:
         return pd.DataFrame(columns=COLUMNS)
-    fitted = MODELS[model_name]().fit(hist, horizons=horizons)
+    fitted = (trained.with_baseline(hist, horizons) if trained is not None
+              else MODELS[model_name]().fit(hist, horizons=horizons))
     pred = fitted.predict(hist, run_date, horizons)
     if pred.empty:
         return pd.DataFrame(columns=COLUMNS)
@@ -59,8 +65,9 @@ def make_forecast(history: pd.DataFrame, run_date: date, model_name: str,
 
 
 def publish(con, run_date: date, model_name: str | None = None,
-            today: date | None = None) -> int:
-    """Write run_date's forecasts unless they exist. Returns rows written (0 = skipped).
+            today: date | None = None, model_dir: Path | None = None) -> int:
+    """Write run_date's forecasts of one model unless they exist. Returns rows written
+    (0 = skipped). Rule models are fit here; others are loaded from ml.train's file.
 
     A past run_date is skipped: a forecast written after its day would not be a forecast
     (the ledger integrity test in dbt/models/ml/ would also stop the next build).
@@ -71,21 +78,33 @@ def publish(con, run_date: date, model_name: str | None = None,
     if run_date < today:
         log.warning("not publishing forecasts for past date %s (today is %s)", run_date, today)
         return 0
-    (done,) = con.execute("select count(*) from fct_forecast where run_date = ?",
-                          [run_date]).fetchone()
+    (done,) = con.execute("""select count(*) from fct_forecast
+                             where run_date = ? and model_version like ?""",
+                          [run_date, f"{model_name}-%"]).fetchone()
     if done:
-        log.info("forecasts for %s already published (%s rows); nothing written",
-                 run_date, done)
+        log.info("%s forecasts for %s already published (%s rows); nothing written",
+                 model_name, run_date, done)
         return 0
+    trained, version = None, model_version(model_name)
+    if model_name not in MODELS:
+        from ml.train import load, model_path
+        path = model_path(model_name, model_dir)
+        if not path.exists():
+            log.warning("no trained %s at %s (ml.train runs weekly); skipped", model_name, path)
+            return 0
+        since = pd.Timestamp(run_date) - timedelta(
+            days=settings()["baselines"]["max_staleness_days"] + 1)
+        trained, version = load(path, load_features(con, since=since.date()),
+                                load_calendar(con))
     history = load_history(con)
     if history.empty:
         log.warning("no price history; nothing to forecast")
         return 0
-    fc = make_forecast(history, run_date, model_name)
+    fc = make_forecast(history, run_date, model_name, trained=trained)
     if fc.empty:
         raise RuntimeError(f"price history exists but no series could be forecast for "
                            f"{run_date} (all older than the staleness limit?)")
-    fc = fc.assign(model_version=model_version(model_name), created_at=utc_now())
+    fc = fc.assign(model_version=version, created_at=utc_now())
     con.register("new_forecast", fc)
     try:
         con.execute("""
@@ -112,10 +131,19 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     con = duckdb.connect(args.db)
     try:
-        publish(con, args.date)
-    except Exception:
-        log.exception("forecast for %s failed", args.date)
-        return 1
+        try:
+            publish(con, args.date)
+        except Exception:
+            log.exception("forecast for %s failed", args.date)
+            return 1
+        for name in settings()["live"].get("shadow") or []:
+            try:
+                publish(con, args.date, name)
+            except Exception:
+                log.exception("shadow model %s failed for %s; live forecasts unaffected",
+                              name, args.date)
+                if os.environ.get("GITHUB_ACTIONS"):  # shows on the run's summary page
+                    print(f"::warning::shadow model {name} failed for {args.date}")
     finally:
         con.close()
     return 0

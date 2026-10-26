@@ -153,6 +153,25 @@ def province_names() -> dict[int, str]:
     return dict(zip(df["province_id"], df["name"], strict=True))
 
 
+def live_model() -> str:
+    """`live.model` in ml/settings.yaml: the forecast users see (shadow models stay hidden).
+    Read line by line because PyYAML is not a dashboard dependency."""
+    in_live = False
+    for line in (ROOT / "ml" / "settings.yaml").read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith(" "):
+            in_live = line.rstrip() == "live:"
+        elif in_live and line.strip().startswith("model:"):
+            return line.split(":", 1)[1].split("#")[0].strip()
+    return "naive"
+
+
+def rgba(hex_color: str, alpha: float) -> str:
+    h = hex_color.lstrip("#")
+    return f"rgba({int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)},{alpha})"
+
+
 def latest_price_date() -> date | None:
     df = query("select max(date) as d from fct_daily_price")
     d = df["d"].iloc[0]

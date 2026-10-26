@@ -38,6 +38,15 @@ live:
   # Model published daily by `python -m ml.forecast`. The naive baseline runs until a model
   # passes Gate 3, so the ledger's track record starts now rather than when the model is ready.
   model: naive
+  # Also published daily and scored by the ledger, but not the model users see (owner decision
+  # 2026-10-27): a test on data that did not exist when the model was built. A shadow model
+  # that fails or has no trained file is skipped without failing the daily job.
+  shadow: [lgbm_routed]
+
+models:
+  # Where `python -m ml.train` saves trained models (one file per model name; the date and
+  # git hash are inside it and in model_version). The workflows carry it via the data release.
+  dir: ml/models
 
 lgbm:
   # Global LightGBM, one model per horizon and quantile (spec: direct strategy).

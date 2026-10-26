@@ -19,3 +19,6 @@ data/*.duckdb.wal
 # The sample DB IS committed (TEAM.md §3.5).
 !data/sample/panganwatch_sample.duckdb
 dbt/.user.yml
+
+# Trained models travel through the data release, not git.
+ml/models/*.json.gz

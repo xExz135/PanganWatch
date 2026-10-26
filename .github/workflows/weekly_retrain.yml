@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e .[analytics]
+      - run: pip install -e .[analytics,ml]
 
       - name: Restore the published database
         run: |
@@ -54,7 +54,10 @@ jobs:
           run_if_present decision.savings_backtest
           run_if_present analytics.run
 
-      - name: Publish database
+      - name: Publish database and trained models
         run: |
           python -m ingestion.archive pack-db --out out
           gh release upload "$DATA_TAG" out/panganwatch.duckdb.gz --clobber
+          if ls ml/models/*.json.gz >/dev/null 2>&1; then
+            gh release upload "$DATA_TAG" ml/models/*.json.gz --clobber
+          fi

@@ -42,7 +42,7 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -e .
+        run: pip install -e .[ml]   # LightGBM for the shadow forecasts (owner OK 2026-10-27)
 
       - name: Restore data from the release
         run: |
@@ -53,6 +53,9 @@ jobs:
             echo "::warning::release '$DATA_TAG' not found; starting with empty data"
           fi
           python -m ingestion.archive unpack --src dist
+          # the weekly job's trained model (absent until its first run: shadow is skipped)
+          mkdir -p ml/models
+          cp dist/*.json.gz ml/models/ 2>/dev/null || echo "no trained model in the release yet"
 
       - name: Run pipeline
         run: |
