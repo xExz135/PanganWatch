@@ -15,7 +15,7 @@ date even by mistake. Forecasters implement:
     fitted.predict(history, run_date, horizons) -> keys, horizon_days, target_date, q10..q90
 
 Run on a database (prints a summary; writes nothing to the shared DB before Gate 1):
-    python -m ml.backtest [--db PATH] [--models naive,seasonal_naive] [--out results.csv]
+    python -m ml.backtest [--db PATH] [--models naive,seasonal_naive,lgbm_quantile] [--out CSV]
 """
 
 from __future__ import annotations
@@ -232,14 +232,24 @@ def _relative_rows(df: pd.DataFrame, point_col: str, model_version: str) -> list
 
 # --- command line ------------------------------------------------------------------------
 
-def _forecasters(names: list[str]) -> list:
+def _forecasters(names: list[str], con=None) -> list:
     from ml.baselines import NaiveForecaster, SeasonalNaiveForecaster
 
-    known = {"naive": NaiveForecaster, "seasonal_naive": SeasonalNaiveForecaster}
-    unknown = set(names) - set(known)
+    known = {"naive", "seasonal_naive", "lgbm_quantile"}
+    unknown = set(names) - known
     if unknown:
         raise SystemExit(f"unknown models: {sorted(unknown)} (known: {sorted(known)})")
-    return [known[n]() for n in names]
+    out = []
+    for n in names:
+        if n == "naive":
+            out.append(NaiveForecaster())
+        elif n == "seasonal_naive":
+            out.append(SeasonalNaiveForecaster())
+        else:
+            from ml.data import load_calendar, load_features
+            from ml.lgbm import LGBMForecaster
+            out.append(LGBMForecaster(features=load_features(con), calendar=load_calendar(con)))
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -258,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
     con = duckdb.connect(args.db, read_only=True)
     try:
         history, calendar = load_history(con), load_calendar(con)
+        forecasters = _forecasters(args.models.split(","), con)
     finally:
         con.close()
     if history.empty:
@@ -266,8 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     folds = make_folds(history["date"].max())
     print(f"{len(folds)} folds, first cutoff {folds[0].cutoff:%Y-%m-%d}, "
           f"last run date {folds[-1].test_end - pd.Timedelta(days=1):%Y-%m-%d}")
-    scored = label_segments(run_backtest(history, _forecasters(args.models.split(",")), folds),
-                            calendar)
+    scored = label_segments(run_backtest(history, forecasters, folds), calendar)
     if args.out:
         scored.to_csv(args.out, index=False)
     m = evaluate(scored, model_version="baselines")

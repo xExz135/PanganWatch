@@ -38,3 +38,24 @@ live:
   # Model published daily by `python -m ml.forecast`. The naive baseline runs until a model
   # passes Gate 3, so the ledger's track record starts now rather than when the model is ready.
   model: naive
+
+lgbm:
+  # Global LightGBM, one model per horizon and quantile (spec: direct strategy).
+  objective: quantile
+  learning_rate: 0.05
+  num_leaves: 63
+  min_data_in_leaf: 200
+  feature_fraction: 0.8
+  bagging_fraction: 0.8
+  bagging_freq: 1
+  lambda_l2: 1.0
+  max_rounds: 1000
+  early_stopping_rounds: 50
+  # Weekend and holiday run dates reuse the last published day's features; at most this many
+  # run dates are generated per feature row (a Friday row serves Sat, Sun and Mon).
+  max_origins_per_row: 3
+  # Share of training examples kept (random, fixed seed) to bound training time.
+  train_sample: 1.0
+  seed: 42
+  # Calibrate the 80% range on the second half of each fold's validation slice (CQR).
+  conformal: true

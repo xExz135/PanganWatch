@@ -24,6 +24,14 @@ def load_history(con, market_tier: str | None = None) -> pd.DataFrame:
 
 
 def load_calendar(con) -> pd.DataFrame:
-    df = con.execute("select date, is_ramadan, days_since_lebaran from dim_date").df()
+    df = con.execute("""select date, is_ramadan, days_since_lebaran, days_to_lebaran,
+                               is_holiday, day_of_week from dim_date""").df()
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
+def load_features(con) -> pd.DataFrame:
+    """fct_features (DS, dbt/models/ml/): one row per published day x series."""
+    df = con.execute("select * from fct_features order by date, commodity_id, province_id").df()
     df["date"] = pd.to_datetime(df["date"])
     return df
