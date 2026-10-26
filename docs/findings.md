@@ -69,3 +69,28 @@ covers transport, losses and spoilage as well as profit; this analysis can't spl
 *Method.* `ana_a1_margins_monthly`: per month, the median of same-day, same-province ratios
 (producer / retail, wholesale / retail) over province-days with all three prices;
 `ana_a1_margins_summary`: the median month, and the first vs last 12 months.
+
+## A4 — Reference-price compliance
+
+**The medium-rice price ceiling has not held anywhere since 2022.** In traditional markets,
+medium rice was above its HET ceiling on 97–100% of province-days under each of the five
+regulations in force from January 2022 to October 2026, and 33 of 34 provinces were above it on
+at least 95% of their days. East Java and Central Java, both rice-surplus provinces, were above
+it on every published day since January 2022, a run still going. Under the current ceiling
+(Kepbadan 299/2025, from 22 August 2025) the share is 99.9% of province-days, by a median 14%.
+Reference prices (HAP) for other foods hold more often: since the June 2024 increases, eggs
+were above theirs on 46% of province-days (81–82% under the two earlier references) and
+chicken on 37% (61% in 2022). Red bird's-eye chili was above its HAP on 60% of province-days
+since September 2024, by a median 39% when above. For a policy reader: the rice ceiling
+describes a price few traditional markets charge.
+
+*Caveats.* PIHPS's "medium rice I" may not match the regulation's definition of medium rice
+exactly, so part of the gap can be grade. HAP is a reference price, not a legal ceiling, and
+its upper bound is used. Four regulations were checked against news reports because no
+official copy was found online (`source_kind = press_report`): the rice ceilings of 2017 and
+2025, the 2024 relaxation letters, and the 2020 egg and chicken references.
+
+*Method.* `fct_reference_compliance` compares each province's daily price with the HET/HAP in
+force for its zone. `ana_a4_compliance_regulation` (per regulation, with its source),
+`ana_a4_compliance_province` (days above, longest and current run of published days above) and
+`ana_a4_compliance_monthly` (the heatmap).

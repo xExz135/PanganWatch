@@ -239,3 +239,35 @@ def test_insights_margins_tab(gold, monkeypatch):
     specs = [c.proto.spec for c in at.get("plotly_chart")]
     assert any("producer share fell from 76% to 67%" in s for s in specs)
     assert any("Left out" in c.value and "Cooking oil" in c.value for c in at.caption)
+
+
+def test_insights_price_ceiling_tab(gold, monkeypatch):
+    con = duckdb.connect(str(gold))
+    con.execute("""
+        create table ana_a4_compliance_regulation as select * from (values
+            ('cabai_rawit_merah', 'traditional', 'Perbapanas 12/2024', 'HAP',
+             date '2024-09-26', date '2026-10-16', 2, 0.6, 0.39, 1, 57000, 57000,
+             'regulation_text', 'https://example.org/reg')
+        ) t(commodity_id, market_tier, regulation, price_type, first_date, last_date,
+            n_provinces, share_above, median_excess_when_above, n_provinces_mostly_above,
+            reference_min_idr, reference_max_idr, source_kind, source_url)
+    """)
+    con.execute("""
+        create table ana_a4_compliance_province as select * from (values
+            ('cabai_rawit_merah', 31, 'traditional', 0.7, 120, 3),
+            ('cabai_rawit_merah', 35, 'traditional', 0.5, 40, 0)
+        ) t(commodity_id, province_id, market_tier, share_above, longest_streak_days,
+            current_streak_days)
+    """)
+    con.execute("""
+        create table ana_a4_compliance_monthly as
+        select 'cabai_rawit_merah' as commodity_id, p as province_id,
+               'traditional' as market_tier, date '2026-01-01' + interval (m) month as month,
+               20 as n_days, 0.6 as share_above, 'Perbapanas 12/2024' as regulations
+        from range(0, 6) t(m), (values (31), (35)) v(p)
+    """)
+    con.close()
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    specs = [c.proto.spec for c in at.get("plotly_chart")]
+    assert any("longest run above the reference 120 published days (DKI Jakarta)" in s
+               for s in specs)

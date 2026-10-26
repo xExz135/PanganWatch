@@ -104,3 +104,34 @@ models:
       - name: producer_share
         data_tests: [not_null]
 
+  - name: ana_a4_compliance_regulation
+    description: >
+      A4 per commodity, market tier and regulation period: share of province-days above the
+      HET ceiling or HAP reference (upper bound), median excess when above, provinces above on
+      most days, and the regulation's source. Shares and excess are decimals.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, market_tier, regulation]}
+    columns:
+      - name: share_above
+        data_tests: [not_null]
+      - name: regulation
+        data_tests: [not_null]
+
+  - name: ana_a4_compliance_province
+    description: >
+      A4 per commodity, province and market tier: days above the reference, longest and
+      current streak of published days above it, median excess when above.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, province_id, market_tier]}
+    columns:
+      - name: longest_streak_days
+        data_tests: [not_null]
+
+  - name: ana_a4_compliance_monthly
+    description: A4 heatmap data. Share of published days above the reference per month.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, province_id, market_tier, month]}
+

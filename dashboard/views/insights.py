@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from common import (
     DIVERGING,
+    SEQUENTIAL_BLUE,
     TIER_COLORS,
     V1_COMMODITIES,
     commodity_names,
@@ -16,6 +17,7 @@ from common import (
     page_header,
     province_names,
     query,
+    rupiah,
     short_names,
     table_exists,
     theme,
@@ -31,6 +33,11 @@ def rgba(hex_color: str, alpha: float) -> str:
     h = hex_color.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
     return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def share(v: float) -> str:
+    """0.999 -> '99.9%': never round a near-total up to 100%."""
+    return f"{v:.1%}" if 0.995 <= v < 1 else f"{v:.0%}"
 
 
 def change(index_value: float) -> str:
@@ -344,13 +351,137 @@ def margins_tab() -> None:
     )
 
 
-tabs = st.tabs(["Lebaran & Ramadan", "Volatility & risk", "Farm-to-market margins"])
+def compliance_tab() -> None:
+    needed = ["ana_a4_compliance_regulation", "ana_a4_compliance_province",
+              "ana_a4_compliance_monthly"]
+    if not all(table_exists(t) for t in needed):
+        st.info("This analysis appears after the next data update.")
+        return
+    regs = query("""select commodity_id, regulation, price_type, first_date, last_date,
+                           n_provinces, share_above, median_excess_when_above,
+                           n_provinces_mostly_above, reference_min_idr, reference_max_idr,
+                           source_kind, source_url
+                    from ana_a4_compliance_regulation where market_tier = 'traditional'""")
+    if regs.empty:
+        st.info("No reference prices overlap the price history yet.")
+        return
+    st.markdown(
+        "**Question:** do traditional-market prices stay under the government's ceiling (HET) "
+        "and reference prices (HAP)? Each regulation is cited with its source below."
+    )
+    # the regulation in force most recently, per commodity
+    latest = (regs.sort_values("first_date").groupby("commodity_id").tail(1)
+              .sort_values("share_above"))
+    labels = [f"{short.get(r.commodity_id, r.commodity_id)} ({r.price_type})"
+              for r in latest.itertuples()]
+    rice = latest[latest["commodity_id"] == "beras_medium_1"]
+    if not rice.empty:
+        r = rice.iloc[0]
+        title = (f"Medium rice sold above its ceiling on {share(r['share_above'])} of "
+                 f"province-days since {pd.Timestamp(r['first_date']):%b %Y}, in "
+                 f"{int(r['n_provinces_mostly_above'])} of {int(r['n_provinces'])} provinces")
+    else:
+        title = "Share of province-days above the reference price, latest regulation"
+    color = TIER_COLORS[mode]["traditional"]
+    bars = go.Figure(go.Bar(
+        x=latest["share_above"], y=labels, orientation="h", marker={"color": color},
+        text=[share(v) for v in latest["share_above"]], textposition="outside",
+        cliponaxis=False,
+        customdata=latest[["regulation", "median_excess_when_above"]],
+        hovertemplate=("%{y}: above on %{x:.0%} of province-days<br>%{customdata[0]}"
+                       "<br>median %{customdata[1]:.0%} above when above<extra></extra>"),
+    ))
+    bars.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=max(380, 34 * len(latest)),
+        margin={"l": 10, "r": 40, "t": 60, "b": 10}, bargap=0.3,
+        xaxis={"title": "Share of province-days above, latest regulation", "tickformat": ".0%",
+               "range": [0, 1.08]},
+    )
+    st.plotly_chart(bars, theme="streamlit", width="stretch")
+    st.caption("HET = harga eceran tertinggi (a legal ceiling); HAP = harga acuan penjualan "
+               "(a reference price; its upper bound is used). Traditional markets. Bulk oil's "
+               "ceiling ended in Aug 2024.")
+
+    # --- one commodity: province x month ------------------------------------------------
+    order = list(latest.sort_values("share_above", ascending=False)["commodity_id"])
+    commodity = st.selectbox("Commodity", order, format_func=lambda c: names.get(c, c),
+                             key="a4_commodity")
+    pnames = province_names()
+    monthly = query("""select province_id, month, share_above, n_days, regulations
+                       from ana_a4_compliance_monthly
+                       where commodity_id = ? and market_tier = 'traditional'
+                       order by month""", (commodity,))
+    prov = query("""select province_id, share_above, longest_streak_days, current_streak_days
+                    from ana_a4_compliance_province
+                    where commodity_id = ? and market_tier = 'traditional'""", (commodity,))
+    if monthly.empty or prov.empty:
+        st.info("No months to show.")
+        return
+    prov_order = list(prov.sort_values("share_above", ascending=False)["province_id"])
+    grid = monthly.pivot(index="province_id", columns="month", values="share_above")
+    grid = grid.reindex(prov_order)
+    regs_by_month = monthly.groupby("month")["regulations"].first()
+    worst = prov.sort_values("longest_streak_days").iloc[-1]
+    title = (f"{short.get(commodity, commodity)}: longest run above the reference "
+             f"{int(worst['longest_streak_days'])} published days "
+             f"({pnames[worst['province_id']]})")
+    heat = go.Figure(go.Heatmap(
+        z=grid.to_numpy(), x=list(grid.columns), y=[pnames[p] for p in grid.index],
+        zmin=0, zmax=1,
+        colorscale=[[i / (len(SEQUENTIAL_BLUE[mode]) - 1), c]
+                    for i, c in enumerate(SEQUENTIAL_BLUE[mode])],
+        customdata=[[regs_by_month.get(m, "") for m in grid.columns] for _ in grid.index],
+        colorbar={"title": "Days above", "tickformat": ".0%"},
+        xgap=1, ygap=1,
+        hovertemplate=("%{y}, %{x|%b %Y}: above on %{z:.0%} of days<br>%{customdata}"
+                       "<extra></extra>"),
+    ))
+    heat.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=max(440, 20 * len(grid)),
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
+        yaxis={"autorange": "reversed", "tickmode": "array",
+               "tickvals": [pnames[p] for p in grid.index], "tickfont": {"size": 11}},
+    )
+    st.plotly_chart(heat, theme="streamlit", width="stretch")
+
+    with st.expander("Regulations and table view"):
+        t = regs[regs["commodity_id"] == commodity].sort_values("first_date")
+        periods = [f"{pd.Timestamp(a):%d %b %Y} – {pd.Timestamp(b):%d %b %Y}"
+                   for a, b in zip(t["first_date"], t["last_date"], strict=True)]
+        refs = [rupiah(lo) if lo == hi else f"{rupiah(lo)} – {rupiah(hi)}"
+                for lo, hi in zip(t["reference_min_idr"], t["reference_max_idr"], strict=True)]
+        st.dataframe(pd.DataFrame({
+            "Regulation": t["regulation"],
+            "Type": t["price_type"],
+            "In force (in data)": periods,
+            "Reference": refs,
+            "Province-days above": t["share_above"].map(lambda v: f"{v:.0%}"),
+            "Median excess when above": t["median_excess_when_above"].map(
+                lambda v: "–" if pd.isna(v) else f"{v:.0%}"),
+            "Source": t["source_url"],
+            "Source kind": t["source_kind"].str.replace("_", " "),
+        }), hide_index=True, column_config={"Source": st.column_config.LinkColumn()})
+        st.caption("Reference prices differ by zone; the range shows the lowest and highest "
+                   "zone. 'Press report' rows were checked against news because no official "
+                   "copy was found online.")
+    st.markdown(
+        "**How it's measured.** Each province's traditional-market price is compared every "
+        "published day with the HET or HAP in force for its zone on that day. A run counts "
+        "published days in a row above the reference and continues across a regulation change "
+        "while the price stays above the new one."
+    )
+
+
+tabs = st.tabs(["Lebaran & Ramadan", "Volatility & risk", "Farm-to-market margins",
+               "Price ceilings"])
 with tabs[0]:
     lebaran_tab()
 with tabs[1]:
     volatility_tab()
 with tabs[2]:
     margins_tab()
-st.caption("More analyses (price-ceiling breaches, how price moves spread between provinces, "
-           "how fast producer price changes reach shoppers) are added here as they are finished.")
+with tabs[3]:
+    compliance_tab()
+st.caption("More analyses (how price moves spread between provinces, how fast producer "
+           "price changes reach shoppers) are added here as they are finished.")
 footer()
