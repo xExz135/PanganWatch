@@ -18,7 +18,8 @@ vars:
   max_working_days_stale: 2
   daily_jump_threshold: 0.60
   coverage_min_share: 0.80
-  tier_order_max_violation_share: 0.05
+  # tier_order test: a tier may sit up to this far above the next tier up (national monthly medians)
+  tier_order_tolerance: 0.10
   row_count_tolerance: 0.30
   source_gap_max: 0.15
   # BPS CPI expenditure groups kept: 1551 food, beverages & tobacco; 1552 food

@@ -27,6 +27,7 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-25 — Architecture diagram as Mermaid in the README, not `docs/architecture.png`.** GitHub renders it, it is diffable and can't drift from a binary copy. A PNG can be exported from it for the write-up if needed.
 - **2026-10-25 — Missing sources give empty bronze views, not errors.** A fresh checkout without a BPS key still builds; tested.
 - **2026-10-25 — Staging rebuilds fully from bronze each run (for now).** Simple and always correct; fine at today's ~2,000 files. Switch `stg_pihps_price` to incremental when the build passes ~5 minutes.
+- **2026-10-26 — `tier_order` test checks national monthly medians with a 10% tolerance (owner-approved).** The first version (more than 5% of a commodity-month's days out of order) warned on 1,143 of 1,218 months: in real PIHPS data producer > wholesale on 24% of same-city days, and province monthly medians still break 29% of the time. National monthly medians break by more than 10% in 11 months (chili and shallot spikes, 2-province garlic), while swapping producer and retail flags 812. Still a warning. Tolerance: `tier_order_tolerance` in `dbt_project.yml`.
 
 ## Data Analyst
 

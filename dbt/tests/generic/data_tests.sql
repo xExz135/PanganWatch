@@ -87,16 +87,25 @@ where abs({{ column_name }}) > {{ var('source_gap_max') }}
 
 
 {% test tier_order(model) %}
--- producer <= wholesale <= retail on most days: flag commodity-months where more than
--- tier_order_max_violation_share of matched rows break the order (real data is noisy).
-select
-    commodity_id,
-    date_trunc('month', date) as month,
-    avg(case when producer_price > wholesale_price or wholesale_price > retail_price
-        then 1 else 0 end) as violation_share
-from {{ model }}
-where producer_price is not null and wholesale_price is not null
-group by all
-having avg(case when producer_price > wholesale_price or wholesale_price > retail_price
-    then 1 else 0 end) > {{ var('tier_order_max_violation_share') }}
+-- producer <= wholesale <= retail, on national monthly medians per commodity.
+-- Days, cities and even province-months often break the order in real PIHPS data
+-- (docs/source_notes.md), so only the national month is checked. Flags a month where a tier
+-- sits more than tier_order_tolerance above the next tier up; a swapped tier or a unit
+-- error flags most months (812 of 1,218 with producer and retail swapped).
+with monthly as (
+    select
+        commodity_id,
+        date_trunc('month', date) as month,
+        median(producer_price) as producer_price,
+        median(wholesale_price) as wholesale_price,
+        median(retail_price) as retail_price
+    from {{ model }}
+    where producer_price is not null and wholesale_price is not null
+    group by all
+)
+
+select *
+from monthly
+where producer_price > wholesale_price * (1 + {{ var('tier_order_tolerance') }})
+    or wholesale_price > retail_price * (1 + {{ var('tier_order_tolerance') }})
 {% endtest %}
