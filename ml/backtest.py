@@ -15,7 +15,8 @@ date even by mistake. Forecasters implement:
     fitted.predict(history, run_date, horizons) -> keys, horizon_days, target_date, q10..q90
 
 Run on a database (prints a summary; writes nothing to the shared DB before Gate 1):
-    python -m ml.backtest [--db PATH] [--models naive,seasonal_naive,lgbm_quantile] [--out CSV]
+    python -m ml.backtest [--db PATH] [--out CSV]
+        [--models naive,seasonal_naive,lgbm_quantile,lgbm_routed]
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -60,7 +62,7 @@ def make_folds(last_date, n_cutoffs: int | None = None, step_days: int | None = 
 
 def run_backtest(history: pd.DataFrame, forecasters: Iterable, folds: list[Fold],
                  horizons: list[int] | None = None, origin_every_days: int | None = None,
-                 season_days: int | None = None) -> pd.DataFrame:
+                 season_days: int | None = None, progress: bool = False) -> pd.DataFrame:
     """Forecasts of every forecaster for every fold, with actuals and MASE scales attached."""
     cfg = settings()
     keys = list(cfg["target"]["series_keys"])
@@ -90,6 +92,7 @@ def run_backtest(history: pd.DataFrame, forecasters: Iterable, folds: list[Fold]
                  .rename("mase_scale").reset_index().assign(fold_id=fold.fold_id))
         scales.append(scale)
         for forecaster in forecasters:
+            started = time.monotonic()
             fitted = forecaster.fit(train, valid, horizons=horizons)
             run_date = fold.cutoff
             while run_date < fold.test_end:
@@ -99,6 +102,9 @@ def run_backtest(history: pd.DataFrame, forecasters: Iterable, folds: list[Fold]
                     out.append(pred.assign(model_name=forecaster.name, fold_id=fold.fold_id,
                                            cutoff=fold.cutoff, run_date=run_date))
                 run_date += every
+            if progress:
+                print(f"fold {fold.fold_id + 1}/{len(folds)} {forecaster.name}: "
+                      f"{time.monotonic() - started:.0f} s", flush=True)
     if not out:
         return pd.DataFrame()
     res = pd.concat(out, ignore_index=True)
@@ -235,7 +241,7 @@ def _relative_rows(df: pd.DataFrame, point_col: str, model_version: str) -> list
 def _forecasters(names: list[str], con=None) -> list:
     from ml.baselines import NaiveForecaster, SeasonalNaiveForecaster
 
-    known = {"naive", "seasonal_naive", "lgbm_quantile"}
+    known = {"naive", "seasonal_naive", "lgbm_quantile", "lgbm_routed"}
     unknown = set(names) - known
     if unknown:
         raise SystemExit(f"unknown models: {sorted(unknown)} (known: {sorted(known)})")
@@ -248,7 +254,9 @@ def _forecasters(names: list[str], con=None) -> list:
         else:
             from ml.data import load_calendar, load_features
             from ml.lgbm import LGBMForecaster
-            out.append(LGBMForecaster(features=load_features(con), calendar=load_calendar(con)))
+            from ml.routed import RoutedForecaster
+            lgbm = LGBMForecaster(features=load_features(con), calendar=load_calendar(con))
+            out.append(lgbm if n == "lgbm_quantile" else RoutedForecaster(model=lgbm))
     return out
 
 
@@ -276,8 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     folds = make_folds(history["date"].max())
     print(f"{len(folds)} folds, first cutoff {folds[0].cutoff:%Y-%m-%d}, "
-          f"last run date {folds[-1].test_end - pd.Timedelta(days=1):%Y-%m-%d}")
-    scored = label_segments(run_backtest(history, forecasters, folds), calendar)
+          f"last run date {folds[-1].test_end - pd.Timedelta(days=1):%Y-%m-%d}", flush=True)
+    scored = label_segments(run_backtest(history, forecasters, folds, progress=True), calendar)
     if args.out:
         scored.to_csv(args.out, index=False)
     m = evaluate(scored, model_version="baselines")

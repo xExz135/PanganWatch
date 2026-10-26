@@ -74,6 +74,9 @@ class LGBMForecaster:
     models: dict = field(default_factory=dict)        # (horizon, quantile) -> Booster
     widen: dict = field(default_factory=dict)          # horizon -> log-space widening of 80%
     best_rounds: dict = field(default_factory=dict)    # (horizon, quantile) -> rounds
+    # horizon -> per-commodity MAE of q50 and of the last price on the calibration half of the
+    # validation slice (data before the fold's cutoff); ml.routed picks a model from it
+    validation: dict = field(default_factory=dict)
     _origins: pd.DataFrame | None = field(default=None, repr=False)
 
     def __post_init__(self):
@@ -133,7 +136,7 @@ class LGBMForecaster:
             "bagging_freq": p["bagging_freq"], "lambda_l2": p["lambda_l2"],
             "seed": p["seed"], "verbose": -1, "num_threads": 0,
         }
-        fitted = replace(self, models={}, widen={}, best_rounds={})
+        fitted = replace(self, models={}, widen={}, best_rounds={}, validation={})
         rng = np.random.default_rng(p["seed"])
         for h in horizons:
             ex = self.examples(h, actual, cutoff)
@@ -160,7 +163,23 @@ class LGBMForecaster:
                 fitted.models[(h, q)] = booster
                 fitted.best_rounds[(h, q)] = booster.best_iteration or booster.current_iteration()
             fitted.widen[h] = fitted._conformal_widen(h, cal, cols) if p["conformal"] else 0.0
+            if len(cal):
+                fitted.validation[h] = fitted._validation_mae(h, cal, cols)
         return fitted
+
+    def _validation_mae(self, h: int, cal: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+        """Per commodity: MAE (rupiah) of this model's q50 and of the last published price."""
+        mid = min(self.quantiles, key=lambda q: abs(q - 0.5))
+        q50 = self._raw_quantiles(h, cal, cols)[mid]
+        lp, target = cal["log_price"].to_numpy(), cal["target"].to_numpy()
+        actual = np.exp(lp + target)
+        return (pd.DataFrame({"commodity_id": cal["commodity_id"].astype(str).to_numpy(),
+                              "mae_model": np.abs(np.exp(lp + q50) - actual),
+                              "mae_naive": np.abs(np.exp(lp) - actual)})
+                .groupby("commodity_id").agg(mae_model=("mae_model", "mean"),
+                                             mae_naive=("mae_naive", "mean"),
+                                             n=("mae_model", "size"))
+                .reset_index())
 
     def _raw_quantiles(self, h: int, x: pd.DataFrame, cols: list[str]) -> dict[float, np.ndarray]:
         preds = {q: self.models[(h, q)].predict(x[cols], num_iteration=self.best_rounds[(h, q)])

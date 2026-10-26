@@ -59,3 +59,8 @@ lgbm:
   seed: 42
   # Calibrate the 80% range on the second half of each fold's validation slice (CQR).
   conformal: true
+
+routing:
+  # lgbm_routed: per commodity and horizon, use LightGBM only if its validation MAE is below
+  # (1 - min_gain) x the naive MAE. 0 = any improvement counts (set before the backtest ran).
+  min_gain: 0.0
