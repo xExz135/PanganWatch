@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: ana_a5_lebaran_daily
+    description: >
+      A5 Lebaran & Ramadan effects, one row per commodity x Lebaran year x day from 60 days
+      before to 30 days after Lebaran. National traditional-market price (median across
+      provinces), divided by its centered 365-day rolling median, indexed to 100 over the
+      week around day -60. Ramadan starts at day -30 or -29.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, lebaran_year, event_day]}
+    columns:
+      - name: commodity_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_commodity'), field: commodity_id}
+      - name: event_day
+        description: Days from Lebaran; negative = before.
+        data_tests: [not_null]
+      - name: index_value
+        description: 100 = the price trend two months before Lebaran.
+        data_tests: [not_null]
+
+  - name: ana_a5_lebaran_phases
+    description: >
+      A5 summary per commodity and phase of the Lebaran cycle: the per-year average index,
+      then the median, min and max across years.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, phase_order]}
+    columns:
+      - name: index_median
+        data_tests: [not_null]
+      - name: n_years
+        data_tests: [not_null]
+
+  - name: ana_a5_lebaran_curve
+    description: A5 chart data. Median index and min-max band across years per event day.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, event_day]}

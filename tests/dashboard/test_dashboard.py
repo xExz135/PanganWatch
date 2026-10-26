@@ -143,3 +143,42 @@ def test_pages_work_before_any_logged_run(tmp_path, monkeypatch):
     build_gold(db, with_runs=False)
     for page in [None, "views/explore.py", "views/data_quality.py"]:
         run_page(db, monkeypatch, page)
+
+
+def add_lebaran_tables(path: Path) -> None:
+    """Minimal A5 tables: chili +35% in Ramadan week 1, back to +2% before Lebaran."""
+    con = duckdb.connect(str(path))
+    phases = [(1, "60-46 days before", 104), (2, "45-31 days before", 121),
+              (3, "Ramadan week 1", 135), (4, "Ramadan weeks 2-3", 104),
+              (5, "Last week before Lebaran", 102), (6, "Lebaran + 0-13 days", 106),
+              (7, "Lebaran + 14-30 days", 105)]
+    con.execute("""create table ana_a5_lebaran_phases (commodity_id varchar, phase_order int,
+                   phase varchar, index_median double, index_min double, index_max double,
+                   n_years bigint)""")
+    con.executemany(
+        "insert into ana_a5_lebaran_phases values ('cabai_rawit_merah', ?, ?, ?, ?, ?, 5)",
+        [(o, name, v, v - 10, v + 10) for o, name, v in phases])
+    con.execute("""create table ana_a5_lebaran_curve as
+                   select 'cabai_rawit_merah' as commodity_id, d as event_day,
+                          100.0 + d % 7 as index_median, 95.0 as index_min, 110.0 as index_max,
+                          5::bigint as n_years
+                   from range(-60, 31) t(d)""")
+    con.execute("""create table ana_a5_lebaran_daily as
+                   select 'cabai_rawit_merah' as commodity_id, y as lebaran_year
+                   from range(2022, 2027) t(y)""")
+    con.close()
+
+
+def test_insights_waits_for_analysis_tables(gold, monkeypatch):
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    assert any("next data update" in i.value for i in at.info)
+
+
+def test_insights_lebaran_tab(gold, monkeypatch):
+    add_lebaran_tables(gold)
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    assert at.title[0].value == "Insights"
+    charts = at.get("plotly_chart")
+    assert len(charts) == 2  # overview heatmap + one commodity's curve
+    assert "+35% in Ramadan's first week" in charts[1].proto.spec
+    assert "+2% in the last week before Lebaran" in charts[1].proto.spec

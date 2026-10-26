@@ -44,6 +44,7 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-25 — Compliance uses the traditional and modern retail tiers.** Consumer references apply to retail sales; producer and wholesale prices are left out.
 - **2026-10-25 — Streaks count published days.** PIHPS skips weekends and holidays, so `consecutive_days_above` counts days with a price, and a weekend does not break a streak.
 - **2026-10-25 — Region-to-province map lives in `dim_reference_price`, not a second seed.** Regulations name regions ("Jawa, Lampung dan Sumatera Selatan"); the map follows their wording and is documented in the model's `.yml`. Rice zones changed in 2025 (Sulawesi moved to zone 2), so the seed lists regions per regulation rather than fixed zone numbers.
+- **2026-10-26 — A5 uses the national price, detrended by a centered 365-day median, and reports the median year with the min–max range.** The centered window keeps slow inflation out of the Lebaran effect (fine for a look-back analysis; never used for forecasting). The median, not the mean, so one extreme year (2022 oil crisis, 2026 chili) doesn't set the headline; the range shows how much years differ. Base = the average of days −63 to −57, because PIHPS skips weekends and a single day −60 is often missing.
 
 ## Data Scientist
 
