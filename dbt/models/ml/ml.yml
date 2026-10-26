@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: ml_forecast_audit
+    description: >
+      fct_forecast (written by `python -m ml.forecast`, append-only) plus rule checks.
+      Empty before the first forecast. Every check is error severity: a failure stops the
+      daily job before anything is published.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [run_date, model_version, commodity_id, province_id, horizon_days]
+    columns:
+      - name: bad_target_date
+        description: target_date is not run_date + horizon_days.
+        data_tests: [is_false]
+      - name: bad_quantile_order
+        description: q10 <= q50 <= q90 is broken.
+        data_tests: [is_false]
+      - name: written_after_run_date
+        description: >
+          Ledger integrity. A forecast row was written after its run_date (WIB), i.e. a
+          past forecast was added or replaced after the fact.
+        data_tests: [is_false]
+
+  - name: ml_ledger_audit
+    description: >
+      fct_forecast_ledger (written by `python -m ml.ledger`) plus rule checks. One row per
+      scored forecast; targets with no published or only imputed prices are never scored.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [run_date, model_version, commodity_id, province_id, horizon_days]
+    columns:
+      - name: no_matching_forecast
+        description: A ledger row has no forecast behind it.
+        data_tests: [is_false]
+      - name: scored_too_early
+        description: Scored before the target day was over.
+        data_tests: [is_false]
+      - name: error_mismatch
+        description: abs_error or in_interval_80 disagrees with the forecast and actual price.
+        data_tests: [is_false]

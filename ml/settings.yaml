@@ -33,3 +33,8 @@ metrics:
 segments:
   # ramadan_lebaran = target date inside Ramadan or up to this many days after Lebaran.
   post_lebaran_days: 7
+
+live:
+  # Model published daily by `python -m ml.forecast`. The naive baseline runs until a model
+  # passes Gate 3, so the ledger's track record starts now rather than when the model is ready.
+  model: naive
