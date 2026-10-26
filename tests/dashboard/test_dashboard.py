@@ -295,3 +295,21 @@ def test_insights_transmission_tab(gold, monkeypatch):
     specs = [c.proto.spec for c in at.get("plotly_chart")]
     assert any("Rises reach the market faster than falls for 1 of 1 foods" in s for s in specs)
     assert any("lifts the market price 6.6% within two months" in s for s in specs)
+
+
+def test_insights_spillover_tab(gold, monkeypatch):
+    con = duckdb.connect(str(gold))
+    con.execute("alter table dim_province add column production_center_commodities varchar[]")
+    con.execute("""update dim_province set production_center_commodities = ['cabai_rawit_merah']
+                   where province_id = 35""")
+    con.execute("""
+        create table ana_a3_spillover as select * from (values
+            ('cabai_rawit_merah', 31, 0.57, 0.57, 0, true, 400.0, false)
+        ) t(commodity_id, province_id, same_day_correlation, best_correlation, lag_days,
+            has_clear_link, km_to_nearest_centre, is_thin)
+    """)
+    con.close()
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    specs = [c.proto.spec for c in at.get("plotly_chart")]
+    assert any("how closely each province moves with the producing centres" in s
+               for s in specs)  # no province beyond 1,500 km in this toy, so no near/far line

@@ -572,8 +572,120 @@ def transmission_tab() -> None:
     )
 
 
+def spillover_tab() -> None:
+    if not table_exists("ana_a3_spillover"):
+        st.info("This analysis appears after the next data update.")
+        return
+    spill = query("""select s.commodity_id, s.province_id, p.name, p.lat, p.lon,
+                            s.same_day_correlation, s.best_correlation, s.lag_days,
+                            s.has_clear_link, s.km_to_nearest_centre, s.is_thin
+                     from ana_a3_spillover as s join dim_province as p using (province_id)""")
+    if spill.empty:
+        st.info("Not enough overlapping prices yet.")
+        return
+    st.markdown(
+        "**Question:** when prices move in the main producing provinces, do other provinces "
+        "follow, and how quickly? A regional buyer far from Java wants to know whether a "
+        "Java price jump is a warning."
+    )
+    order = [c for c in V1_COMMODITIES if c in set(spill["commodity_id"])]
+    commodity = st.selectbox("Commodity", order, format_func=lambda c: names.get(c, c),
+                             key="a3_commodity")
+    s = spill[(spill["commodity_id"] == commodity) & ~spill["is_thin"]]
+    centres = query("""select name, lat, lon from dim_province
+                       where list_contains(production_center_commodities, ?)""", (commodity,))
+    near = s.loc[s["km_to_nearest_centre"] < 500, "same_day_correlation"].median()
+    far = s.loc[s["km_to_nearest_centre"] > 1500, "same_day_correlation"].median()
+    label = short.get(commodity, commodity)
+    if pd.notna(near) and pd.notna(far):
+        title = (f"{label}: provinces within 500 km of the producing centres move with them "
+                 f"the same day (correlation {near:.2f}); beyond 1,500 km, {far:.2f}")
+    else:
+        title = f"{label}: how closely each province moves with the producing centres"
+
+    # --- map: colour = days until the province moves with the centres -------------------
+    surface = "#1a1a19" if mode == "dark" else "#fcfcfb"
+    clear = s[s["has_clear_link"]]
+    weak = s[~s["has_clear_link"]]
+    mapfig = go.Figure()
+    mapfig.add_trace(go.Scattergeo(
+        lat=weak["lat"], lon=weak["lon"], mode="markers", name="No clear link",
+        marker={"size": 12, "color": "rgba(137,135,129,0.45)",
+                "line": {"width": 2, "color": surface}},
+        customdata=list(zip(weak["name"], weak["same_day_correlation"], strict=True)),
+        hovertemplate=("<b>%{customdata[0]}</b><br>No clear link "
+                       "(same day %{customdata[1]:.2f})<extra></extra>"),
+    ))
+    mapfig.add_trace(go.Scattergeo(
+        lat=clear["lat"], lon=clear["lon"], mode="markers", name="Moves after the centres",
+        marker={"size": 14, "line": {"width": 2, "color": surface},
+                "color": clear["lag_days"], "cmin": 0, "cmax": 14,
+                "colorscale": [[i / (len(SEQUENTIAL_BLUE[mode]) - 1), c]
+                               for i, c in enumerate(SEQUENTIAL_BLUE[mode])],
+                "colorbar": {"title": "Days after<br>the centres"}},
+        customdata=list(zip(clear["name"], clear["lag_days"], clear["best_correlation"],
+                            strict=True)),
+        hovertemplate=("<b>%{customdata[0]}</b><br>Moves %{customdata[1]} days after the "
+                       "centres (correlation %{customdata[2]:.2f})<extra></extra>"),
+    ))
+    mapfig.add_trace(go.Scattergeo(
+        lat=centres["lat"], lon=centres["lon"], mode="markers", name="Producing centre",
+        marker={"size": 16, "symbol": "star", "color": DIVERGING[mode][-1],
+                "line": {"width": 1, "color": surface}},
+        customdata=centres["name"],
+        hovertemplate="<b>%{customdata}</b><br>Producing centre<extra></extra>",
+    ))
+    mapfig.update_geos(
+        projection_type="mercator", lataxis_range=[-11.5, 6.5], lonaxis_range=[94, 142],
+        showland=True, landcolor="rgba(137,135,129,0.15)", showcountries=False,
+        showocean=False, showlakes=False, bgcolor="rgba(0,0,0,0)",
+    )
+    mapfig.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=440,
+        margin={"l": 0, "r": 0, "t": 50, "b": 0}, legend={"orientation": "h", "y": -0.05},
+    )
+    st.plotly_chart(mapfig, theme="streamlit", width="stretch")
+    st.caption("Colour = how many days after the centres a province's price change lines up "
+               "best (0 = the same day), shown where the link is clear (correlation ≥ 0.2). "
+               "Producing centres are the main producing provinces (marked as unverified).")
+
+    # --- distance vs same-day link ------------------------------------------------------
+    color = TIER_COLORS[mode]["traditional"]
+    sc = go.Figure(go.Scatter(
+        x=s["km_to_nearest_centre"], y=s["same_day_correlation"], mode="markers",
+        marker={"size": 10, "color": color, "line": {"width": 2, "color": surface}},
+        customdata=s["name"], name="Province",
+        hovertemplate=("<b>%{customdata}</b><br>%{x:,.0f} km from the nearest centre<br>"
+                       "same-day correlation %{y:.2f}<extra></extra>"),
+    ))
+    r = s["km_to_nearest_centre"].corr(s["same_day_correlation"])
+    sc.update_layout(
+        title={"text": f"The link fades with distance (correlation with distance {r:+.2f})",
+               "font": {"size": 15}},
+        height=360, margin={"l": 10, "r": 10, "t": 60, "b": 10},
+        xaxis={"title": "Distance to the nearest producing centre, km", "tickformat": ",.0f"},
+        yaxis={"title": "Same-day correlation of daily price changes"},
+    )
+    st.plotly_chart(sc, theme="streamlit", width="stretch")
+
+    with st.expander("Table view"):
+        t = s.sort_values("km_to_nearest_centre")
+        st.dataframe(pd.DataFrame({
+            "Province": t["name"],
+            "Km to nearest centre": t["km_to_nearest_centre"].round(0).astype(int),
+            "Same-day correlation": t["same_day_correlation"].round(2),
+            "Moves after (days)": t["lag_days"].map(lambda v: "–" if pd.isna(v) else str(int(v))),
+            "Best correlation": t["best_correlation"].round(2),
+        }), hide_index=True)
+    st.markdown(
+        "**How it's measured.** Each province's daily traditional-market price change is "
+        "compared with the producing centres' change on the same day and up to 21 days "
+        "earlier. This shows which prices move together and when, not what causes the move."
+    )
+
+
 tabs = st.tabs(["Lebaran & Ramadan", "Volatility & risk", "Farm-to-market margins",
-               "Producer to market speed", "Price ceilings"])
+               "Producer to market speed", "Spread between provinces", "Price ceilings"])
 with tabs[0]:
     lebaran_tab()
 with tabs[1]:
@@ -583,7 +695,7 @@ with tabs[2]:
 with tabs[3]:
     transmission_tab()
 with tabs[4]:
+    spillover_tab()
+with tabs[5]:
     compliance_tab()
-st.caption("One more analysis (how price moves spread between provinces) is added here "
-           "when it is finished.")
 footer()

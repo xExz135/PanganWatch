@@ -23,13 +23,15 @@ jobs:
       - name: Tests (incl. dbt on a fixture)
         run: pytest -q
       - name: dbt build on the sample DB
-        # Rebuilds seeds and gold on top of the sample's silver tables (the sample has no
-        # bronze files, so staging is not rebuilt here; the pytest fixture covers staging).
+        # Rebuilds seeds, gold and the analyses on top of the sample's silver tables (the sample
+        # has no bronze files, so staging is not rebuilt here; the pytest fixture covers
+        # staging). Analyses must be included: their tests also reference gold tables, so dbt
+        # selects those tests whenever gold is selected.
         if: hashFiles('data/sample/panganwatch_sample.duckdb') != ''
         working-directory: dbt
         run: |
           cp ../data/sample/panganwatch_sample.duckdb /tmp/sample.duckdb
-          PANGANWATCH_DB=/tmp/sample.duckdb dbt build --profiles-dir . --select "resource_type:seed marts"
+          PANGANWATCH_DB=/tmp/sample.duckdb dbt build --profiles-dir . --select "resource_type:seed marts analyses"
 
   ownership:
     # TEAM.md §4: a PR may touch only paths its author role owns (by branch prefix).

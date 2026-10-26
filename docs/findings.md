@@ -1,5 +1,7 @@
 # Findings
 
+**Status: all six findings signed off by the project owner on 2026-10-26 (Gate 2).**
+
 One paragraph per analysis, each with a number, a period and a place. Numbers come from the
 `ana_*` tables built by dbt (`dbt/models/analyses/`); the dashboard's Insights page shows the
 charts. Prices are national traditional-market prices (median across 34 provinces) from
@@ -119,3 +121,28 @@ average market price is regressed on rises and falls in its producer price (the 
 end) in the same month and the two before, pooled over provinces with errors clustered by
 province; Wald tests compare rises and falls in the same month and in total
 (`ana_a2_transmission_summary`, `ana_a2_transmission_lags`).
+
+## A3 — Spatial spillover
+
+**A price move in Java's producing provinces shows up the same day in nearby provinces and
+fades with distance; it doesn't travel outward over days.** From January 2022 to October 2026,
+daily traditional-market price changes of red bird's-eye chili in provinces within 500 km of a
+producing centre moved with the centres' change on the same day (median correlation 0.57),
+against 0.08 for provinces more than 1,500 km away; across provinces, the link weakened with
+distance (correlation −0.65). Curly chili (0.34 near, 0.02 far), chicken (0.25, 0.01) and
+eggs (0.19, 0.03) follow the same pattern. Of the 84 province links clear enough to time
+(correlation ≥ 0.2), 49 peak on the same day and 74 within a week. Rice is the exception:
+daily changes hardly line up anywhere (median same-day correlation 0.01). For a regional
+buyer: a Java chili jump is a same-day signal for Banten, Lampung or Bali, but says little
+about prices in Papua or Maluku.
+
+*Caveats.* The producing centres are a hand-made list (`production_centers` seed, marked
+unverified). A correlation shows prices moving together, not one causing the other: a shared
+shock such as weather or a holiday can move everywhere at once. Lags of 7 or more days may
+reflect PIHPS's weekly rhythm rather than travel time. Provinces with one reporting city are
+left out.
+
+*Method.* `ana_a3_spillover_lags`: correlation between each non-centre province's daily log
+price change and the centres' change (median of the centre provinces, on days they all
+reported) 0–21 days earlier; `ana_a3_spillover`: same-day correlation, the best lag where the
+link is clear, and the distance to the nearest centre.

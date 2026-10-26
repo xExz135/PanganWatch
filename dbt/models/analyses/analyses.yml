@@ -135,3 +135,27 @@ models:
       - unique_combination:
           arguments: {columns: [commodity_id, province_id, market_tier, month]}
 
+  - name: ana_a3_spillover_lags
+    description: >
+      A3 correlation between a non-centre province's daily traditional-market price change and
+      the production centres' change lag_days earlier (0-21). Centres per commodity come from
+      the production_centers seed. Pairs with fewer than 200 days are dropped.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, province_id, lag_days]}
+    columns:
+      - name: correlation
+        data_tests: [not_null]
+
+  - name: ana_a3_spillover
+    description: >
+      A3 summary per commodity and non-centre province: same-day correlation with the
+      production centres, the lag with the highest correlation where the link is clear
+      (>= 0.2; NULL otherwise), and the distance to the nearest centre in km.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, province_id]}
+    columns:
+      - name: km_to_nearest_centre
+        data_tests: [not_null]
+

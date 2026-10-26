@@ -51,6 +51,7 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-26 — A1 shares are medians of same-day, same-province ratios, summarised per national month.** Ratios keep each comparison like-for-like (the same province on the same day); single days and provinces are too noisy (docs/source_notes.md). Commodities with producer prices from fewer than 10 provinces in a typical month are left out of the chart.
 - **2026-10-26 — A2 runs on months, not weeks (spec deviation, owner_requests DA #5).** PIHPS updates producer prices about once a month (docs/source_notes.md), so a weekly regression measures the update calendar. Retail = the month's average; producer = the figure in force at month end; lags 0–2 months; pooled over provinces with province-clustered errors; the current incomplete month is left out. Besides the spec's test on total pass-through, a second test compares the same-month effects (speed).
 - **2026-10-26 — A4 reports per regulation period and cites each regulation's source.** A streak counts published days above the reference and carries across a regulation change while the price stays above the new reference (as in `fct_reference_compliance`).
+- **2026-10-26 — A3 times a link only where it is clear (best correlation ≥ 0.2).** With ~1,000 days, noise over 22 lags rarely exceeds 0.1, so the highest of 22 weak correlations would give a random lag. Rice shows almost no daily link, so its lags are not reported. Calendar-day lags; changes are between consecutive published days.
 
 ## Data Scientist
 
