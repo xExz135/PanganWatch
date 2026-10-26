@@ -22,6 +22,10 @@ dashboard = [
     "streamlit>=1.66",
     "plotly>=5.24",
 ]
+# Statistics for the analyses (analytics/, run weekly); owner-approved 2026-10-26.
+analytics = [
+    "statsmodels>=0.14",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

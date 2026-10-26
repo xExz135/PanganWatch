@@ -28,6 +28,7 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-25 — Missing sources give empty bronze views, not errors.** A fresh checkout without a BPS key still builds; tested.
 - **2026-10-25 — Staging rebuilds fully from bronze each run (for now).** Simple and always correct; fine at today's ~2,000 files. Switch `stg_pihps_price` to incremental when the build passes ~5 minutes.
 - **2026-10-26 — `tier_order` test checks national monthly medians with a 10% tolerance (owner-approved).** The first version (more than 5% of a commodity-month's days out of order) warned on 1,143 of 1,218 months: in real PIHPS data producer > wholesale on 24% of same-city days, and province monthly medians still break 29% of the time. National monthly medians break by more than 10% in 11 months (chili and shallot spikes, 2-province garlic), while swapping producer and retail flags 812. Still a warning. Tolerance: `tier_order_tolerance` in `dbt_project.yml`.
+- **2026-10-26 — `statsmodels` as the optional group `.[analytics]` (owner-approved).** Only CI and the weekly workflow (which runs `analytics.run`) install it; the daily job stays light.
 
 ## Data Analyst
 
@@ -48,6 +49,8 @@ One line per decision and why. Each role edits only its own section (TEAM.md §2
 - **2026-10-26 — A national price needs at least 80% of the usual provinces that day.** On holidays one or two provinces report alone and their median is not a national price (MS-20261026-da-1). `ana_national_price` applies the rule for the analyses; the Today and Explore pages apply it in their own queries.
 - **2026-10-26 — A6 jump risk = share of days followed by a 15%+ rise within 14 days.** The same definition as the forecasting team's spike label, so the dashboard's risk ranking and the spike model talk about the same event. Province series with one reporting city are flagged and left out of rankings; series with under 60 measurable days are dropped.
 - **2026-10-26 — A1 shares are medians of same-day, same-province ratios, summarised per national month.** Ratios keep each comparison like-for-like (the same province on the same day); single days and provinces are too noisy (docs/source_notes.md). Commodities with producer prices from fewer than 10 provinces in a typical month are left out of the chart.
+- **2026-10-26 — A2 runs on months, not weeks (spec deviation, owner_requests DA #5).** PIHPS updates producer prices about once a month (docs/source_notes.md), so a weekly regression measures the update calendar. Retail = the month's average; producer = the figure in force at month end; lags 0–2 months; pooled over provinces with province-clustered errors; the current incomplete month is left out. Besides the spec's test on total pass-through, a second test compares the same-month effects (speed).
+- **2026-10-26 — A4 reports per regulation period and cites each regulation's source.** A streak counts published days above the reference and carries across a regulation change while the price stays above the new reference (as in `fct_reference_compliance`).
 
 ## Data Scientist
 

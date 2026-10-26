@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e .[dev,dashboard]
+      - run: pip install -e .[dev,dashboard,analytics]
       - name: Lint
         run: ruff check .
       - name: Tests (incl. dbt on a fixture)

@@ -472,8 +472,108 @@ def compliance_tab() -> None:
     )
 
 
+def transmission_tab() -> None:
+    if not (table_exists("ana_a2_transmission_summary")
+            and table_exists("ana_a2_transmission_lags")):
+        st.info("This analysis appears after the next weekly update.")
+        return
+    summ = query("""select commodity_id, n_provinces, rise_same_month, fall_same_month,
+                           rise_total, fall_total, p_value_equal_totals,
+                           p_value_equal_same_month, r_squared, first_month, last_month
+                    from ana_a2_transmission_summary""")
+    if summ.empty:
+        st.info("Not enough matched producer and market prices yet.")
+        return
+    st.markdown(
+        "**Question:** when the producer price moves, how much of it reaches the market "
+        "price, and how fast? Do rises travel faster than falls?"
+    )
+    up_color, down_color = DIVERGING[mode][-1], DIVERGING[mode][0]
+    s = summ.sort_values("rise_same_month")
+    ylab = [short.get(c, c) for c in s["commodity_id"]]
+    fig = go.Figure()
+    for col, label, color in [("rise_same_month", "10% rise", up_color),
+                              ("fall_same_month", "10% fall", down_color)]:
+        fig.add_trace(go.Bar(
+            x=s[col] * 10, y=ylab, orientation="h", name=label, marker={"color": color},
+            hovertemplate=("%{y}: a " + label + " in the producer price moves the market "
+                           "price %{x:.1f}% the same month<extra></extra>"),
+        ))
+    rice = summ[summ["commodity_id"] == "beras_medium_1"]
+    faster = int(((summ["rise_same_month"] > summ["fall_same_month"])
+                  & (summ["p_value_equal_same_month"] < 0.05)).sum())
+    if not rice.empty:
+        r = rice.iloc[0]
+        title = (f"Rises reach the market faster than falls for {faster} of {len(summ)} foods: "
+                 f"medium rice moves {r['rise_same_month'] * 10:.1f}% the same month after a "
+                 f"10% producer rise, {abs(r['fall_same_month']) * 10:.1f}% after a 10% fall")
+    else:
+        title = f"Rises reach the market faster than falls for {faster} of {len(summ)} foods"
+    fig.update_layout(
+        barmode="group", title={"text": title, "font": {"size": 15}},
+        height=max(440, 30 * len(s)), margin={"l": 10, "r": 10, "t": 60, "b": 10},
+        xaxis={"title": "Market price change in the same month, % (per 10% producer change)"},
+        legend={"orientation": "h", "y": -0.1}, bargap=0.25,
+    )
+    st.plotly_chart(fig, theme="streamlit", width="stretch")
+    st.caption(f"Months {pd.Timestamp(summ['first_month'].min()):%b %Y} to "
+               f"{pd.Timestamp(summ['last_month'].max()):%b %Y}, pooled over provinces with "
+               "both producer and traditional-market prices.")
+
+    order = list(summ.sort_values("rise_same_month", ascending=False)["commodity_id"])
+    commodity = st.selectbox("Commodity", order, format_func=lambda c: names.get(c, c),
+                             index=order.index("beras_medium_1")
+                             if "beras_medium_1" in order else 0, key="a2_commodity")
+    lags = query("""select direction, lag_months, cumulative from ana_a2_transmission_lags
+                    where commodity_id = ? order by direction, lag_months""", (commodity,))
+    row = summ[summ["commodity_id"] == commodity].iloc[0]
+    title = (f"{short.get(commodity, commodity)}: a 10% producer rise lifts the market price "
+             f"{row['rise_total'] * 10:.1f}% within two months, a 10% fall lowers it "
+             f"{abs(row['fall_total']) * 10:.1f}%")
+    line = go.Figure()
+    for direction, label, color in [("rise", "10% rise", up_color),
+                                    ("fall", "10% fall", down_color)]:
+        d = lags[lags["direction"] == direction]
+        line.add_trace(go.Scatter(
+            x=d["lag_months"], y=d["cumulative"].abs() * 10, name=label,
+            mode="lines+markers", line={"color": color, "width": 2}, marker={"size": 8},
+            hovertemplate=("After %{x} months: " + label + " → %{y:.1f}% in the market price"
+                           "<extra></extra>"),
+        ))
+    line.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=360,
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
+        xaxis={"title": "Months after the producer change", "tickvals": [0, 1, 2],
+               "ticktext": ["Same month", "1 month", "2 months"]},
+        yaxis={"title": "Market price change, % (size)", "rangemode": "tozero"},
+        legend={"orientation": "h", "y": -0.2},
+    )
+    st.plotly_chart(line, theme="streamlit", width="stretch")
+
+    with st.expander("Table view"):
+        t = summ.sort_values("rise_same_month", ascending=False)
+        st.dataframe(pd.DataFrame({
+            "Commodity": [names.get(c, c) for c in t["commodity_id"]],
+            "Rise, same month": (t["rise_same_month"] * 10).map(lambda v: f"{v:.1f}%"),
+            "Fall, same month": (t["fall_same_month"].abs() * 10).map(lambda v: f"{v:.1f}%"),
+            "Rise, 2 months": (t["rise_total"] * 10).map(lambda v: f"{v:.1f}%"),
+            "Fall, 2 months": (t["fall_total"].abs() * 10).map(lambda v: f"{v:.1f}%"),
+            "Same-month gap p": t["p_value_equal_same_month"].map(lambda v: f"{v:.3f}"),
+            "2-month gap p": t["p_value_equal_totals"].map(lambda v: f"{v:.3f}"),
+            "Provinces": t["n_provinces"],
+        }), hide_index=True)
+        st.caption("Per 10% producer change. p below 0.05 = the rise/fall gap is unlikely to "
+                   "be chance; with 19 foods tested, about one would pass by chance.")
+    st.markdown(
+        "**How it's measured.** PIHPS updates producer prices once a month, so this works "
+        "in months: the change in a province's average market price is regressed on rises "
+        "and falls in its producer price that month and the two before, pooled over "
+        "provinces. It measures how prices move together, not what causes them to."
+    )
+
+
 tabs = st.tabs(["Lebaran & Ramadan", "Volatility & risk", "Farm-to-market margins",
-               "Price ceilings"])
+               "Producer to market speed", "Price ceilings"])
 with tabs[0]:
     lebaran_tab()
 with tabs[1]:
@@ -481,7 +581,9 @@ with tabs[1]:
 with tabs[2]:
     margins_tab()
 with tabs[3]:
+    transmission_tab()
+with tabs[4]:
     compliance_tab()
-st.caption("More analyses (how price moves spread between provinces, how fast producer "
-           "price changes reach shoppers) are added here as they are finished.")
+st.caption("One more analysis (how price moves spread between provinces) is added here "
+           "when it is finished.")
 footer()

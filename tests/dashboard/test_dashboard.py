@@ -271,3 +271,27 @@ def test_insights_price_ceiling_tab(gold, monkeypatch):
     specs = [c.proto.spec for c in at.get("plotly_chart")]
     assert any("longest run above the reference 120 published days (DKI Jakarta)" in s
                for s in specs)
+
+
+def test_insights_transmission_tab(gold, monkeypatch):
+    con = duckdb.connect(str(gold))
+    con.execute("""
+        create table ana_a2_transmission_summary as select * from (values
+            ('cabai_rawit_merah', 27, 0.61, -0.49, 0.66, -0.60, 0.06, 0.0001, 0.65,
+             date '2022-04-01', date '2026-09-01')
+        ) t(commodity_id, n_provinces, rise_same_month, fall_same_month, rise_total,
+            fall_total, p_value_equal_totals, p_value_equal_same_month, r_squared,
+            first_month, last_month)
+    """)
+    con.execute("""
+        create table ana_a2_transmission_lags as select * from (values
+            ('cabai_rawit_merah', 'rise', 0, 0.61), ('cabai_rawit_merah', 'rise', 1, 0.66),
+            ('cabai_rawit_merah', 'rise', 2, 0.66), ('cabai_rawit_merah', 'fall', 0, -0.49),
+            ('cabai_rawit_merah', 'fall', 1, -0.58), ('cabai_rawit_merah', 'fall', 2, -0.60)
+        ) t(commodity_id, direction, lag_months, cumulative)
+    """)
+    con.close()
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    specs = [c.proto.spec for c in at.get("plotly_chart")]
+    assert any("Rises reach the market faster than falls for 1 of 1 foods" in s for s in specs)
+    assert any("lifts the market price 6.6% within two months" in s for s in specs)

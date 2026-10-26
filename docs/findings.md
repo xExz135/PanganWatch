@@ -94,3 +94,28 @@ official copy was found online (`source_kind = press_report`): the rice ceilings
 force for its zone. `ana_a4_compliance_regulation` (per regulation, with its source),
 `ana_a4_compliance_province` (days above, longest and current run of published days above) and
 `ana_a4_compliance_monthly` (the heatmap).
+
+## A2 — Asymmetric price transmission
+
+**Producer price rises reach the market faster than falls, then the two even out.** Pooling
+provinces from April 2022 to September 2026, a 10% rise in the producer price of medium rice
+lifted its traditional-market price by 2.2% in the same month, but a 10% fall lowered it by only
+0.7%; after two months the two were similar (3.2% and 2.8%). Rises travelled faster in the same
+month for all six rice grades and all four chilies (each difference significant at 5%), and for
+grade-1 beef, where falls also never caught up (2.6% versus 1.0% after two months). Chilies pass
+on the most: a 10% producer rise in red bird's-eye chili moved the market price 6.1% the same
+month. Over two months, total pass-through differed for only 5 of 19 foods, and for shallots and
+chicken it was falls that passed through more fully. For a policy reader: when producer prices
+drop, shoppers see the saving a month or more later than they would see a rise.
+
+*Caveats.* PIHPS updates producer prices only once a month, so this is measured in months, not
+the spec's weeks (owner_requests DA #5), and anything faster than a month is invisible. Producer
+and market prices come from partly different cities. With 19 foods tested, about one would show
+a difference by chance; the rice and chili pattern holds in every grade. This measures how
+prices move together, not what causes them to.
+
+*Method.* `python -m analytics.run` (weekly): per commodity, the monthly change in a province's
+average market price is regressed on rises and falls in its producer price (the figure at month
+end) in the same month and the two before, pooled over provinces with errors clustered by
+province; Wald tests compare rises and falls in the same month and in total
+(`ana_a2_transmission_summary`, `ana_a2_transmission_lags`).
