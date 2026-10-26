@@ -26,6 +26,12 @@ dashboard = [
 analytics = [
     "statsmodels>=0.14",
 ]
+# Forecasting models (ml/, Weeks 7-10); owner-approved 2026-10-25.
+ml = [
+    "lightgbm>=4.5",
+    "shap>=0.46",
+    "scikit-learn>=1.5",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

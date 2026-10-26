@@ -1,6 +1,24 @@
 version: 2
 
 models:
+  - name: fct_features
+    description: >
+      Model inputs per published day x commodity x province (traditional market). Every column
+      uses only data that existed by the end of `date`, with each source's delay (producer and
+      wholesale at their last update, weather 15 days late, CPI from the 5th of the next
+      month). Proven by tests/ml/test_features_leakage.py: features up to a cut-off don't
+      change when all later inputs are deleted. Log prices; changes are log differences.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_id, province_id]}
+    columns:
+      - name: log_price
+        data_tests: [not_null]
+      - name: days_unchanged
+        data_tests: [not_null]
+      - name: days_since_fuel_change
+        data_tests: [not_null]
+
   - name: ml_forecast_audit
     description: >
       fct_forecast (written by `python -m ml.forecast`, append-only) plus rule checks.

@@ -134,7 +134,8 @@ def dbt_ml(db_path) -> subprocess.CompletedProcess:
     env = {**os.environ, "PANGANWATCH_DB": str(db_path), "PYTHONUTF8": "1",
            "DBT_SEND_ANONYMOUS_USAGE_STATS": "false"}
     return subprocess.run(
-        [str(DBT), "build", "--profiles-dir", ".", "--select", "path:models/ml",
+        [str(DBT), "build", "--profiles-dir", ".",
+         "--select", "ml_forecast_audit", "ml_ledger_audit",
          "--target-path", str(Path(db_path).parent / "target")],
         cwd=ROOT / "dbt", env=env, capture_output=True, text=True, encoding="utf-8")
 
