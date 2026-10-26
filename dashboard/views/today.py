@@ -35,17 +35,24 @@ names = commodity_names()
 ids = tuple(V1_COMMODITIES)
 marks = ", ".join("?" * len(ids))
 
-# National price = median of province prices (traditional market) on each day.
+# National price = median of province prices (traditional market) on each day, only on
+# days when at least 80% of the usual provinces reported: on holidays one or two provinces
+# report alone, and their median is not a national price (docs/mistakes/MS-20261026-da-1.md).
 national = query(f"""
-    select date, commodity_id, median(price_idr) as price, count(*) as provinces
-    from fct_daily_price
-    where market_tier = 'traditional' and commodity_id in ({marks})
-      and date >= ?::date - 70
-    group by all
+    with daily as (
+        select date, commodity_id, median(price_idr) as price, count(*) as provinces
+        from fct_daily_price
+        where market_tier = 'traditional' and commodity_id in ({marks})
+          and date >= ?::date - 70
+        group by all
+    )
+    select * from daily
+    qualify provinces >= 0.8 * median(provinces) over (partition by commodity_id)
     order by date
 """, (*ids, latest))
+shown = national["date"].max() if not national.empty else latest
 
-st.subheader(f"National prices on {latest:%d %b %Y}")
+st.subheader(f"National prices on {shown:%d %b %Y}")
 st.caption("Median of province prices in traditional markets. Arrow = change vs 7 days earlier; "
            "red means more expensive for a buyer.")
 

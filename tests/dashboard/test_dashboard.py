@@ -182,3 +182,60 @@ def test_insights_lebaran_tab(gold, monkeypatch):
     assert len(charts) == 2  # overview heatmap + one commodity's curve
     assert "+35% in Ramadan's first week" in charts[1].proto.spec
     assert "+2% in the last week before Lebaran" in charts[1].proto.spec
+
+
+def test_today_ignores_a_day_when_few_provinces_reported(gold, monkeypatch):
+    # a holiday: only Jakarta reports, at double the price; it must not become "national"
+    con = duckdb.connect(str(gold))
+    con.execute("""insert into fct_daily_price values
+                   (?, 'minyak_goreng_curah', 31, 'traditional', 36000, 3)""",
+                [LATEST + timedelta(days=1)])
+    con.close()
+    at = run_page(gold, monkeypatch)
+    assert at.subheader[0].value == f"National prices on {LATEST:%d %b %Y}"
+    oil = [m for m in at.metric if m.value == "Rp 18,000"]
+    assert oil, [m.value for m in at.metric]
+
+
+def test_insights_volatility_tab(gold, monkeypatch):
+    con = duckdb.connect(str(gold))
+    con.execute("""
+        create table ana_a6_volatility as select * from (values
+            ('national', null, 'cabai_rawit_merah', 0.23, 230, 1000, 0.037, 0.02, 34.0, false,
+             'high'),
+            ('national', null, 'minyak_goreng_curah', 0.0, 0, 1000, 0.006, 0.002, 34.0, false,
+             'low'),
+            ('province', 31, 'cabai_rawit_merah', 0.46, 460, 1000, 0.05, 0.03, 3.0, false,
+             'high'),
+            ('province', 35, 'cabai_rawit_merah', 0.14, 140, 1000, 0.03, 0.02, 2.0, false,
+             'high')
+        ) t(geo_level, province_id, commodity_id, spike_share, spike_days, n_days,
+            volatility_daily, volatility_90d, median_reporting, is_thin, risk_segment)
+    """)
+    con.close()
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    specs = [c.proto.spec for c in at.get("plotly_chart")]
+    assert any("only 1 of 2 foods jumped 15%+" in s for s in specs)
+    assert any("from 14% of days in Jawa Timur to 46% in DKI Jakarta" in s for s in specs)
+
+
+def test_insights_margins_tab(gold, monkeypatch):
+    con = duckdb.connect(str(gold))
+    con.execute("""
+        create table ana_a1_margins_summary as select * from (values
+            ('cabai_rawit_merah', 0.70, 0.84, 27.0, false, 0.76, 0.67),
+            ('minyak_goreng_curah', 0.86, 0.93, 6.0, true, 0.86, 0.88)
+        ) t(commodity_id, producer_share, wholesale_share, median_provinces, is_thin,
+            producer_share_first_12m, producer_share_last_12m)
+    """)
+    con.execute("""
+        create table ana_a1_margins_monthly as
+        select 'cabai_rawit_merah' as commodity_id, date '2026-01-01' + interval (m) month
+               as month, 0.7 as producer_share, 0.84 as wholesale_share, 27 as n_provinces
+        from range(0, 10) t(m)
+    """)
+    con.close()
+    at = run_page(gold, monkeypatch, "views/insights.py")
+    specs = [c.proto.spec for c in at.get("plotly_chart")]
+    assert any("producer share fell from 76% to 67%" in s for s in specs)
+    assert any("Left out" in c.value and "Cooking oil" in c.value for c in at.caption)

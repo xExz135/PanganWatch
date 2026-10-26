@@ -65,11 +65,17 @@ if not tiers:
 
 tier_marks = ", ".join("?" * len(tiers))
 if province == NATIONAL:
+    # days when under 80% of the usual provinces reported are dropped (holidays)
     series = query(f"""
-        select date, market_tier, median(price_idr) as price_idr, count(*) as n_provinces
-        from fct_daily_price
-        where commodity_id = ? and market_tier in ({tier_marks}) and date >= ?
-        group by all order by date
+        with daily as (
+            select date, market_tier, median(price_idr) as price_idr, count(*) as n_provinces
+            from fct_daily_price
+            where commodity_id = ? and market_tier in ({tier_marks}) and date >= ?
+            group by all
+        )
+        select * from daily
+        qualify n_provinces >= 0.8 * median(n_provinces) over (partition by market_tier)
+        order by date
     """, (commodity, *tiers, start))
 else:
     series = query(f"""

@@ -1,6 +1,20 @@
 version: 2
 
 models:
+  - name: ana_national_price
+    description: >
+      National traditional-market price per commodity and day (median across provinces),
+      only on days when at least 80% of the provinces that usually report the commodity
+      did. Holidays where 1-2 provinces report alone are dropped.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [date, commodity_id]}
+    columns:
+      - name: price_idr
+        data_tests: [not_null]
+      - name: n_provinces
+        data_tests: [not_null]
+
   - name: ana_a5_lebaran_daily
     description: >
       A5 Lebaran & Ramadan effects, one row per commodity x Lebaran year x day from 60 days
@@ -41,3 +55,52 @@ models:
     data_tests:
       - unique_combination:
           arguments: {columns: [commodity_id, event_day]}
+
+  - name: ana_a6_volatility
+    description: >
+      A6 volatility and risk ranking per commodity, nationally (province_id NULL) and per
+      province, traditional markets, whole history. spike_share = share of days followed by
+      a 15%+ rise within 14 days. Province series with one reporting city are flagged
+      is_thin and left out of rankings.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [geo_level, commodity_id, province_id]}
+    columns:
+      - name: geo_level
+        data_tests:
+          - accepted_values:
+              arguments: {values: [national, province]}
+      - name: spike_share
+        description: Decimal share of days (0.23 = 23%).
+        data_tests: [not_null]
+      - name: risk_segment
+        data_tests:
+          - accepted_values:
+              arguments: {values: [low, medium, high]}
+
+  - name: ana_a1_margins_monthly
+    description: >
+      A1 farm-to-table margins per commodity and month, from matched province-days (producer,
+      wholesale and traditional-retail prices all present). Shares are decimals of the retail
+      price: medians of same-day, same-province ratios.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id, month]}
+    columns:
+      - name: producer_share
+        data_tests: [not_null]
+      - name: wholesale_share
+        data_tests: [not_null]
+
+  - name: ana_a1_margins_summary
+    description: >
+      A1 summary per commodity: median monthly producer and wholesale share of the retail
+      price, range, and first vs last 12 months. is_thin = producer prices from fewer than 10
+      provinces in a typical month.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [commodity_id]}
+    columns:
+      - name: producer_share
+        data_tests: [not_null]
+

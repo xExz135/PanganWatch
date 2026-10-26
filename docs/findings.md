@@ -3,16 +3,17 @@
 One paragraph per analysis, each with a number, a period and a place. Numbers come from the
 `ana_*` tables built by dbt (`dbt/models/analyses/`); the dashboard's Insights page shows the
 charts. Prices are national traditional-market prices (median across 34 provinces) from
-PIHPS, Bank Indonesia.
+PIHPS, Bank Indonesia, on days when at least 80% of the usual provinces reported
+(`ana_national_price`).
 
 ## A5 — Lebaran and Ramadan effects
 
 **Chilies get expensive when Ramadan starts, not in the week before Lebaran; shallots are the
-opposite.** Across the five Lebarans from 2022 to 2026, red bird's-eye chili was a median 35%
+opposite.** Across the five Lebarans from 2022 to 2026, red bird's-eye chili was a median 34%
 above its 12-month trend in the first week of Ramadan, but only 2% above it in the last week
 before Lebaran; it was dearer in Ramadan's first week than in the last week before Lebaran in 4 of
 the 5 years. Red curly chili follows the same timing (+6%, then −10%). Shallots kept climbing
-instead: +6% in the last week before Lebaran and +16% two to four weeks after, above trend in
+instead: +3% in the last week before Lebaran and +17% two to four weeks after, above trend in
 all five years (range +7% to +53%). In the median year, medium rice and bulk cooking oil stayed within 1% of trend
 throughout. For a buyer: stock chilies before Ramadan starts, and buy shallots before Lebaran
 rather than after.
@@ -25,3 +26,46 @@ both fell on that Lebaran. The analysis shows when prices move, not why.
 *Method.* National price divided by its centered 365-day rolling median, set to 100 for the
 week around 60 days before Lebaran; per-year phase averages, then the median across years
 (`ana_a5_lebaran_daily`, `ana_a5_lebaran_phases`, `ana_a5_lebaran_curve`).
+
+## A6 — Volatility and risk ranking
+
+**Sudden price jumps are a chili-and-shallot problem; most staples never jumped nationally.**
+From January 2022 to October 2026, the national price of the four chilies rose 15% or more
+within the next two weeks on 13–23% of days (red bird's-eye chili 23%), and shallots on 6.5%.
+Cooking oil did so only in March 2022, when the packaged-oil price ceiling was lifted. The other
+13 of 21 foods, including rice, sugar, beef, chicken, eggs and garlic, never rose 15% within two
+weeks nationally. Locally the risk is higher: in the median province, red bird's-eye chili
+jumped on 32% of days, from 14% in Nusa Tenggara Timur to 46% in Sulawesi Utara (25 provinces
+with at least two reporting cities). For a buyer: chilies and shallots are where buying ahead
+or a price alert pays off; staples can be bought as needed.
+
+*Caveats.* A province price is the median of a few cities (two or three in most provinces), so
+local jumps include single-market noise; the seven provinces with one reporting city are left
+out. "Jump" is any 15% rise within 14 days, so a long rise counts on several days.
+
+*Method.* `ana_a6_volatility`: share of days followed by a 15%+ rise within 14 days (the spike
+label used by the forecasting team), and the standard deviation of daily log price changes,
+national (`ana_national_price`) and per province. Risk: high ≥ 10% of days, medium ≥ 1%, low
+below.
+
+## A1 — Farm-to-table margins
+
+**The fresher and more perishable the food, the smaller the producer's share.** Of every
+Rp 100 paid at a traditional market from January 2022 to October 2026, the producer price was
+Rp 63–70 for the four chilies and shallots, Rp 72 for chicken, and Rp 86–92 for medium rice,
+eggs and beef (national median month, matched province-days only). Most of the chili gap is
+added in the last step: from wholesale to market takes 16–20% of the market price for chilies,
+against 5–7% for rice. The rice gap has narrowed: producers' share of the medium-rice market
+price rose from 82% in the first 12 months (2022) to 87% in the last 12 months, and every
+rice grade moved the same way. For a policy reader: margin pressure is in fresh produce, where
+most of a price spike happens after the producer.
+
+*Caveats.* "Producer" is PIHPS's producer tier (for rice, milled rice at the producer level,
+not unhusked grain), reported by fewer provinces than retail: garlic (2 provinces), premium
+sugar (6) and branded oil type 2 (8) are left out. Producer and wholesale prices often cross on
+single days and in single provinces, so only monthly national medians are used. The margin
+covers transport, losses and spoilage as well as profit; this analysis can't split them.
+
+*Method.* `ana_a1_margins_monthly`: per month, the median of same-day, same-province ratios
+(producer / retail, wholesale / retail) over province-days with all three prices;
+`ana_a1_margins_summary`: the median month, and the first vs last 12 months.

@@ -1,17 +1,16 @@
 {{ config(materialized='table') }}
 -- A5 event study: national traditional-market price around each Lebaran, detrended and indexed.
 -- event_day 0 = Lebaran (Idul Fitri); negative = days before. Ramadan starts at day -30/-29.
---   national price = median across provinces (same as the dashboard's national figure)
+--   national price = median across provinces, days with thin coverage dropped
+--                    (ana_national_price)
 --   trend          = centered 365-day rolling median, so a slow inflation trend or a long
 --                    price cycle is not mistaken for a Lebaran effect
 --   index          = 100 x (price / trend), rebased so the week around day -60 averages 100
 -- Only Lebarans with the full -63..+30 window inside the price history are included.
 
 with national as (
-    select date, commodity_id, median(price_idr) as price_idr, count(*) as n_provinces
-    from {{ ref('fct_daily_price') }}
-    where market_tier = 'traditional' and not is_imputed
-    group by all
+    select date, commodity_id, price_idr, n_provinces
+    from {{ ref('ana_national_price') }}
 ),
 
 trend as (

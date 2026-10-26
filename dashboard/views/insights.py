@@ -4,6 +4,7 @@ A5 Lebaran & Ramadan effects reads ana_a5_lebaran_phases / ana_a5_lebaran_curve
 (dbt/models/analyses/). Other analyses get a tab when their tables exist.
 """
 
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from common import (
@@ -13,6 +14,7 @@ from common import (
     commodity_names,
     footer,
     page_header,
+    province_names,
     query,
     short_names,
     table_exists,
@@ -144,9 +146,211 @@ def lebaran_tab() -> None:
     )
 
 
-tabs = st.tabs(["Lebaran & Ramadan"])
+def volatility_tab() -> None:
+    if not table_exists("ana_a6_volatility"):
+        st.info("This analysis appears after the next data update.")
+        return
+    vol = query("""select geo_level, commodity_id, province_id, spike_share, spike_days, n_days,
+                          volatility_daily, volatility_90d, median_reporting, is_thin,
+                          risk_segment
+                   from ana_a6_volatility""")
+    nat = vol[vol["geo_level"] == "national"].sort_values("spike_share")
+    if nat.empty:
+        st.info("Not enough price history yet.")
+        return
+    st.markdown(
+        "**Question:** which foods can jump in price suddenly, and where? A buyer facing a "
+        "likely jump can stock up early; a stable food can be bought as needed."
+    )
+    color = TIER_COLORS[mode]["traditional"]
+    rising = nat[nat["spike_share"] >= 0.01]
+    never = nat[nat["spike_days"] == 0]
+    title = (f"Nationally, only {len(rising)} of {len(nat)} foods jumped 15%+ within two "
+             f"weeks on more than 1% of days; {len(never)} never did")
+    bars = go.Figure(go.Bar(
+        x=nat["spike_share"], y=[short.get(c, c) for c in nat["commodity_id"]],
+        orientation="h", marker={"color": color},
+        text=[f"{v:.0%}" if v >= 0.005 else "0%" for v in nat["spike_share"]],
+        textposition="outside", cliponaxis=False,
+        customdata=nat[["spike_days", "n_days"]],
+        hovertemplate=("%{y}: a 15%+ rise within 14 days followed %{x:.1%} of days "
+                       "(%{customdata[0]} of %{customdata[1]})<extra></extra>"),
+    ))
+    bars.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=max(420, 24 * len(nat)),
+        margin={"l": 10, "r": 40, "t": 60, "b": 10},
+        xaxis={"title": "Share of days followed by a 15%+ rise within 14 days",
+               "tickformat": ".0%"},
+        bargap=0.3,
+    )
+    st.plotly_chart(bars, theme="streamlit", width="stretch")
+    st.caption("National traditional-market price (median across provinces), 2022 to today.")
+
+    # --- one commodity across provinces -------------------------------------------------
+    prov = vol[(vol["geo_level"] == "province") & ~vol["is_thin"]]
+    choices = [c for c in nat.sort_values("spike_share", ascending=False)["commodity_id"]
+               if c in set(prov["commodity_id"])]
+    commodity = st.selectbox("Commodity", choices, format_func=lambda c: names.get(c, c),
+                             key="a6_commodity")
+    pnames = province_names()
+    g = prov[prov["commodity_id"] == commodity].sort_values("spike_share")
+    national_share = float(nat.loc[nat["commodity_id"] == commodity, "spike_share"].iloc[0])
+    top, low = g.iloc[-1], g.iloc[0]
+    title = (f"{short.get(commodity, commodity)}: from {low['spike_share']:.0%} of days in "
+             f"{pnames[low['province_id']]} to {top['spike_share']:.0%} in "
+             f"{pnames[top['province_id']]} (median province {g['spike_share'].median():.0%})")
+    pfig = go.Figure(go.Bar(
+        x=g["spike_share"], y=[pnames[p] for p in g["province_id"]], orientation="h",
+        marker={"color": color}, name="Province",
+        hovertemplate="%{y}: %{x:.1%} of days<extra></extra>",
+    ))
+    pfig.add_vline(x=national_share, line={"color": "gray", "width": 1, "dash": "dash"},
+                   annotation_text=f"National {national_share:.0%}",
+                   annotation_position="top")
+    pfig.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=max(420, 22 * len(g)),
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
+        xaxis={"title": "Share of days followed by a 15%+ rise within 14 days",
+               "tickformat": ".0%"},
+        yaxis={"tickmode": "array", "tickvals": [pnames[p] for p in g["province_id"]]},
+        bargap=0.3,
+    )
+    st.plotly_chart(pfig, theme="streamlit", width="stretch")
+    n_thin = int(vol[(vol["geo_level"] == "province") & vol["is_thin"]
+                     & (vol["commodity_id"] == commodity)].shape[0])
+    if n_thin:
+        st.caption(f"{n_thin} provinces with only one reporting city are left out: one "
+                   "market's swings are not a province's.")
+
+    with st.expander("Table view"):
+        t = nat.sort_values("spike_share", ascending=False)
+        st.dataframe(pd.DataFrame({
+            "Commodity": [names.get(c, c) for c in t["commodity_id"]],
+            "Risk": t["risk_segment"].str.capitalize(),
+            "Days with a 15%+ jump ahead": t["spike_share"].map(lambda v: f"{v:.1%}"),
+            "Typical daily move": t["volatility_daily"].map(lambda v: f"{v:.2%}"),
+            "Daily move, last 90 days": t["volatility_90d"].map(lambda v: f"{v:.2%}"),
+        }), hide_index=True)
+    st.markdown(
+        "**How it's measured.** For every day, did the price rise 15% or more at some point in "
+        "the next 14 days? The share of such days is the jump risk; high means 10% or more of "
+        "days, medium 1–10%, low under 1%. The typical daily move is the standard deviation of "
+        "day-to-day price changes."
+    )
+
+
+def margins_tab() -> None:
+    if not (table_exists("ana_a1_margins_summary") and table_exists("ana_a1_margins_monthly")):
+        st.info("This analysis appears after the next data update.")
+        return
+    summ = query("""select commodity_id, producer_share, wholesale_share, median_provinces,
+                           is_thin, producer_share_first_12m, producer_share_last_12m
+                    from ana_a1_margins_summary""")
+    ok = summ[~summ["is_thin"]].sort_values("producer_share", ascending=False)
+    if ok.empty:
+        st.info("Not enough matched producer, wholesale and retail prices yet.")
+        return
+    st.markdown(
+        "**Question:** of what a shopper pays at a traditional market, how much is the "
+        "producer price, and how much goes to traders and retailers?"
+    )
+    tiers = TIER_COLORS[mode]
+    ylab = [short.get(c, c) for c in ok["commodity_id"]]
+    parts = [
+        ("Producer price", ok["producer_share"], tiers["producer"]),
+        ("Producer → wholesale", (ok["wholesale_share"] - ok["producer_share"]).clip(lower=0),
+         tiers["wholesale"]),
+        ("Wholesale → market", 1 - ok["wholesale_share"], tiers["traditional"]),
+    ]
+    fig = go.Figure()
+    for label, values, color in parts:
+        fig.add_trace(go.Bar(
+            x=values * 100, y=ylab, orientation="h", name=label, marker={"color": color},
+            hovertemplate="%{y}<br>" + label + ": Rp %{x:.0f} of every Rp 100<extra></extra>",
+        ))
+    fresh = ok[ok["commodity_id"].isin(["cabai_rawit_merah", "cabai_merah_keriting",
+                                        "cabai_merah_besar", "cabai_rawit_hijau",
+                                        "bawang_merah"])]["producer_share"]
+    staple = ok[ok["commodity_id"].isin(["beras_medium_1", "telur_ayam_ras",
+                                         "daging_sapi_1"])]["producer_share"]
+    if not fresh.empty and not staple.empty:
+        title = (f"Producers get Rp {fresh.min() * 100:.0f}–{fresh.max() * 100:.0f} of every "
+                 f"Rp 100 paid for chilies and shallots, Rp {staple.min() * 100:.0f}–"
+                 f"{staple.max() * 100:.0f} for rice, eggs and beef")
+    else:
+        title = "Producer price as a share of the market price"
+    fig.update_layout(
+        barmode="stack", title={"text": title, "font": {"size": 15}},
+        height=max(420, 24 * len(ok)), margin={"l": 10, "r": 10, "t": 60, "b": 10},
+        xaxis={"title": "Rupiah of every Rp 100 paid at a traditional market",
+               "range": [0, 100]},
+        yaxis={"autorange": "reversed"}, legend={"orientation": "h", "y": -0.12},
+        bargap=0.3,
+    )
+    st.plotly_chart(fig, theme="streamlit", width="stretch")
+    thin = summ[summ["is_thin"]]
+    if not thin.empty:
+        st.caption("Left out, producer prices from fewer than 10 provinces: "
+                   + ", ".join(short.get(c, c) for c in thin["commodity_id"]) + ".")
+
+    options = list(ok["commodity_id"])
+    commodity = st.selectbox("Commodity", options, format_func=lambda c: names.get(c, c),
+                             index=options.index("beras_medium_1")
+                             if "beras_medium_1" in options else 0, key="a1_commodity")
+    monthly = query("""select month, producer_share, wholesale_share, n_provinces
+                       from ana_a1_margins_monthly where commodity_id = ? order by month""",
+                    (commodity,))
+    row = ok[ok["commodity_id"] == commodity].iloc[0]
+    first, last = row["producer_share_first_12m"], row["producer_share_last_12m"]
+    word = "rose" if last - first > 0.01 else "fell" if first - last > 0.01 else "held at"
+    title = (f"{short.get(commodity, commodity)}: producer share {word} "
+             + (f"from {first:.0%} to {last:.0%}" if word != "held at" else f"{last:.0%}")
+             + " (first vs last 12 months)")
+    line = go.Figure()
+    for col, label, color in [("producer_share", "Producer price", tiers["producer"]),
+                              ("wholesale_share", "Wholesale price", tiers["wholesale"])]:
+        line.add_trace(go.Scatter(
+            x=monthly["month"], y=monthly[col], name=label, mode="lines",
+            line={"color": color, "width": 2},
+            customdata=monthly["n_provinces"],
+            hovertemplate=("%{x|%b %Y}<br>" + label + ": %{y:.0%} of the market price "
+                           "(%{customdata} provinces)<extra></extra>"),
+        ))
+    line.update_layout(
+        title={"text": title, "font": {"size": 15}}, height=380,
+        margin={"l": 10, "r": 10, "t": 60, "b": 10}, hovermode="x unified",
+        yaxis={"title": "Share of the market price", "tickformat": ".0%"},
+        legend={"orientation": "h", "y": -0.15},
+    )
+    st.plotly_chart(line, theme="streamlit", width="stretch")
+
+    with st.expander("Table view"):
+        t = summ.sort_values("producer_share", ascending=False)
+        st.dataframe(pd.DataFrame({
+            "Commodity": [names.get(c, c) for c in t["commodity_id"]],
+            "Producer share": t["producer_share"].map(lambda v: f"{v:.0%}"),
+            "Wholesale share": t["wholesale_share"].map(lambda v: f"{v:.0%}"),
+            "First 12 months": t["producer_share_first_12m"].map(lambda v: f"{v:.0%}"),
+            "Last 12 months": t["producer_share_last_12m"].map(lambda v: f"{v:.0%}"),
+            "Provinces (typical month)": t["median_provinces"].astype(int),
+        }), hide_index=True)
+    st.markdown(
+        "**How it's measured.** Only province-days with all three prices (producer, wholesale, "
+        "traditional market) count. Each month takes the median of the same-day, "
+        "same-province ratios, and the chart shows the median month since 2022. Single days "
+        "and single provinces are too noisy: PIHPS producer and wholesale prices often cross "
+        "locally. \"Producer\" is PIHPS's producer tier, which for rice is milled rice at the "
+        "producer level, not the farmer's unhusked grain."
+    )
+
+
+tabs = st.tabs(["Lebaran & Ramadan", "Volatility & risk", "Farm-to-market margins"])
 with tabs[0]:
     lebaran_tab()
-st.caption("More analyses (farm-to-market margins, volatility, price-ceiling breaches, how "
-           "price moves spread between provinces) are added here as they are finished.")
+with tabs[1]:
+    volatility_tab()
+with tabs[2]:
+    margins_tab()
+st.caption("More analyses (price-ceiling breaches, how price moves spread between provinces, "
+           "how fast producer price changes reach shoppers) are added here as they are finished.")
 footer()
